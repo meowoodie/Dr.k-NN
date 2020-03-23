@@ -5,10 +5,11 @@
 Robust Classifier
 
 Dependencies:
-- Python  3.7.6
-- NumPy   1.18.1
-- cvxpy   1.1.0a3
-- PyTorch 1.4.0
+- Python      3.7.6
+- NumPy       1.18.1
+- cvxpy       1.1.0a3
+- PyTorch     1.4.0
+- cvxpylayers 0.1.2
 """
 
 import cvxpy as cp
@@ -17,6 +18,7 @@ from cvxpylayers.torch import CvxpyLayer
 
 class RobustClassifier(torch.nn.Module):
     """
+    A Robust Classifier via CvxpyLayer
     """
 
     def __init__(self, n_class, n_sample, n_feature):
@@ -28,13 +30,43 @@ class RobustClassifier(torch.nn.Module):
         super(RobustClassifier, self).__init__()
         self.cvxpylayer = self._cvxpylayer(n_class, n_sample)
 
-    def forward(self, x):
+    def forward(self, x, y):
         """customized forward function"""
+        C_tch     = self._wasserstein_distance(x)
+        Q_tch     = self._empirical_distribution(y)
         gamma_hat = self.cvxpylayer(theta_tch, Q_tch, C_tch) # (n_class [batch_size, n_sample, n_sample])
         gamma_hat = torch.stack(gamma_hat, axis=1)           # [batch_size, n_class, n_sample, n_sample]
 
+        return p
+
+    def _wasserstein_distance(self, x):
+        """
+        the wasserstein distance for the input data via calculating the pairwise norm of two aribtrary 
+        data points in the single batch of the input data, denoted as C here.
+        
+        input
+        - x: [batch_size, n_sample, n_feature]
+        output
+        - C_tch: [n_sample, n_sample]
+        """
+        return C_tch
+
+    def _empirical_distribution(self, y):
+        """
+        the empirical distribution for each class, denoted as Q here.
+
+        input
+        - y: [batch_size, n_sample]
+        output
+        - Q_tch: [n_class, n_sample]
+        """
+        return Q_tch
+
     def _cvxpylayer(self, n_class, n_sample):
         """
+        construct a cvxpylayer that solves a robust classification problem
+        see reference below for the binary case: 
+        http://papers.nips.cc/paper/8015-robust-hypothesis-testing-using-wasserstein-uncertainty-sets
         """
         # TODO: 
         # cvxpy currently doesn't support N-dim variables, see discussion and solution below:
@@ -76,11 +108,3 @@ class RobustClassifier(torch.nn.Module):
         return CvxpyLayer(prob, 
             parameters=[theta, Q, C], 
             variables=gamma)
-
-
-
-
-
-
-
-
