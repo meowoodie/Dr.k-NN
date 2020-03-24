@@ -17,15 +17,14 @@ import numpy as np
 from torchvision import datasets, transforms
 
 class Dataloader4MNIST(torch.utils.data.Dataset):
-    """Face Landmarks dataset."""
+    """Dataloader for MNIST"""
 
     def __init__(self, classes, batch_size, n_sample, shuffle=True):
         """
         Args:
-            csv_file (string): Path to the csv file with annotations.
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
+        - classes:    selected classes in the dataset (from 0 to 9)
+        - batch_size: number of sets of samples in one batch
+        - n_sample:   number of samples in one set.
         """
         # MNIST dataset
         self.dataset    = datasets.MNIST("data", train=True, download=True)
@@ -60,8 +59,7 @@ class Dataloader4MNIST(torch.utils.data.Dataset):
         # normalization
         self.dataset.data    = (self.dataset.data.float() - torch.min(self.dataset.data).float()) /\
             (torch.max(self.dataset.data).float() - torch.min(self.dataset.data).float())
-        
-
+    
     def __len__(self):
         return self.n_batch
 
@@ -78,6 +76,8 @@ class Dataloader4MNIST(torch.utils.data.Dataset):
         # calculate empirical distribution Q
         Q = sortedY2Q(_Y)                               # [batch_size, n_class, n_sample]
         return _X, _Y, Q
+
+
 
 def sortbyclass(X, Y):
     """
