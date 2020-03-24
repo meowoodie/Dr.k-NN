@@ -99,7 +99,7 @@ class RobustImageClassifier(torch.nn.Module):
         # robust classifier layer
         theta = torch.ones(batch_size, self.n_class) * self.max_theta
         p_hat = self.rbstclf(X, Q, theta)       # [batch_size, n_class, n_sample]
-        return X
+        return p_hat
 
 
 
