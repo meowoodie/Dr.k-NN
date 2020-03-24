@@ -18,6 +18,7 @@ Dependencies:
 - arrow       0.13.1
 """
 
+import arrow
 import utils
 import torch 
 import cvxpy as cp
@@ -30,7 +31,7 @@ class RobustImageClassifier(torch.nn.Module):
     A Robust Image Classifier based on multiple CNNs and a Robust Classifier Layer defined below
     """
 
-    def __init__(self, n_class, n_sample, n_feature, 
+    def __init__(self, n_class, n_sample, n_feature, max_theta=0.1,
         n_pixel=28, in_channel=1, out_channel=7, 
         kernel_size=3, stride=1, keepprob=0.2):
         """
@@ -38,6 +39,7 @@ class RobustImageClassifier(torch.nn.Module):
         - n_class:     number of classes
         - n_sample:    number of sets of samples
         - n_feature:   size of the output feature (output of CNN)
+        - max_theta:   threshold for theta_k (empirical distribution)
         - n_pixel:     number of pixels along one axis for an image (n_pixel * n_pixel) 
                        28 in default (mnist)
         - in_channel:  number of in channels for an image
@@ -52,6 +54,9 @@ class RobustImageClassifier(torch.nn.Module):
                        0.2 in default
         """
         super(RobustImageClassifier, self).__init__()
+        # configurations
+        self.n_class   = n_class
+        self.max_theta = max_theta
         # CNN layer 1
         self.conv1 = torch.nn.Conv2d(
             in_channels=in_channel, 
@@ -67,7 +72,7 @@ class RobustImageClassifier(torch.nn.Module):
         # robust classifier layer
         self.rbstclf = RobustClassifierLayer(n_class, n_sample, n_feature)
     
-    def forward(self, X, Q, theta):
+    def forward(self, X, Q):
         """
         customized forward function.
         """
@@ -88,15 +93,12 @@ class RobustImageClassifier(torch.nn.Module):
         # fully-connected layer
         X = self.fc1(X)
         X = F.relu(X)
-        # NOTE: reshape back to batch_size and n_sample
-        X = X.view(batch_size, n_sample, X.shape[-1])
+                                                      # NOTE: reshape back to batch_size and n_sample
+        X = X.view(batch_size, n_sample, X.shape[-1]) # [batch_size, n_sample, n_feature]
 
-        print(X.shape)
-        print(Q.shape)
-        print(theta.shape)
         # robust classifier layer
-        p_hat = self.rbstclf(X, Q, theta)
-        print(p_hat.shape)
+        theta = torch.ones(batch_size, self.n_class) * self.max_theta
+        p_hat = self.rbstclf(X, Q, theta)       # [batch_size, n_class, n_sample]
         return X
 
 
@@ -210,37 +212,24 @@ class RobustClassifierLayer(torch.nn.Module):
 
 
 
-def train_images():
-    """train function"""
-    # model configurations
-    classes     = [0, 1]
-    n_class     = 2
-    n_sample    = 20
-    n_feature   = 10
-    max_theta   = 0.1
-    batch_size  = 2
+def tvloss(p_hat):
+    """TV loss"""
+    p_max, _ = torch.max(p_hat, dim=1) # [batch_size, n_sample]
+    return p_max.sum(dim=1).mean()     # scalar
 
-    # init dataloader
-    dataloader = utils.dataloader4mnistNclasses(classes, batch_size, n_sample)
-    # init model
-    model = RobustImageClassifier(n_class, n_sample, n_feature)
-    # model.train()
-    for X, _, Q in dataloader:
-        # theta_k for class k
-        theta  = torch.ones(batch_size, n_class) * max_theta
-        output = model(X, Q, theta)
-        break
-        # optimizer.zero_grad()
-        # output = model(data)
-        # loss = F.nll_loss(output, label)
-        # loss.backward()
-        # optimizer.step()
-        # if batch_idx % args.log_interval == 0:
-        #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-        #         epoch, batch_idx * len(data), len(train_loader.dataset),
-        #         100. * batch_idx / len(train_loader), loss.item()))
 
-if __name__ == "__main__":
-    train_images()
+
+def train(epoch, model, optimizer, dataloader, log_interval=100):
+    """training procedure for one epoch"""
+    model.train()
+    for batch_idx, (X, _, Q) in enumerate(dataloader):
+        optimizer.zero_grad()
+        p_hat = model(X, Q)
+        loss  = tvloss(p_hat)
+        loss.backward()
+        optimizer.step()
+        if batch_idx % log_interval == 0:
+            print("[%s] Train Epoch: %d [%d]\tLoss: %.3f" % \
+                (arrow.now(), epoch, batch_idx * len(X), loss.item()))
 
 
