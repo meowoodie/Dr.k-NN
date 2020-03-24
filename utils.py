@@ -36,9 +36,9 @@ def dataloader4mnistNclasses(classes, batch_size, n_sample):
     # yield data samples with number of `n_sample` as a single batch.
     batch_X, batch_Y = [], []
     for data, target in dataloader:
-        if torch.unique(target).shape[0] == len(classes):
-            X = data   # [n_sample, n_channel, n_xpixel, n_ypixel]
-            Y = target # [n_sample]
+        if torch.unique(target).shape[0] == len(classes) and target.shape[0] == n_sample:
+            X = data                              # [n_sample, n_channel, n_xpixel, n_ypixel]
+            Y = target                            # [n_sample]
             batch_X.append(X) 
             batch_Y.append(Y)
         else: 

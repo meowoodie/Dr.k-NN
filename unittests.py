@@ -13,6 +13,23 @@ Dependencies:
 import utils
 import torch 
 import numpy as np
+import robustclassifier
+
+def unittest_3():
+    """
+    UNITTEST 3
+    - func: robustclassifier.RobustClassifierLayer
+    """
+    batch_size, n_sample, n_feature, n_class = 5, 10, 7, 2
+    X_tch     = torch.randn(batch_size, n_sample, n_feature, requires_grad=True)
+    Q_tch     = torch.randn(batch_size, n_class, n_sample, requires_grad=True)
+    theta_tch = torch.randn(batch_size, n_class, requires_grad=True)
+
+    model = robustclassifier.RobustClassifierLayer(n_class, n_sample, n_feature)
+    p_hat = model(X_tch, Q_tch, theta_tch)
+
+    print(p_hat)
+    print(model.parameters())
 
 def unittest_2():
     """
@@ -21,11 +38,12 @@ def unittest_2():
     """
     classes    = [1, 2]
     batch_size = 10 
-    n_sample   = 5
+    n_sample   = 50
     dataloader = utils.dataloader4mnistNclasses(classes, batch_size, n_sample)
-    for X, Y, Q in dataloader:
-        print(X.shape)
-        print(Y)
+    for batch_idx, (X, Y, Q) in enumerate(dataloader):
+        # print(X.shape)
+        # print(Y)
+        print(batch_idx)
 
 def unittest_1():
     """
@@ -62,24 +80,4 @@ def unittest_1():
 if __name__ == "__main__":
     # unittest_1()
     unittest_2()
-   
-
-
-# def unittest_3():
-#     """
-#     UNITTEST 3
-#     - func: robustclassifier.RobustClassifierLayer
-#     """
-#     X_tch     = torch.randn(batch_size, n_sample, n_feature, requires_grad=True)
-#     Q_tch     = torch.randn(batch_size, n_class, n_sample, requires_grad=True)
-#     theta_tch = torch.randn(batch_size, n_class, requires_grad=True)
-
-#     model = robustclassifier.RobustClassifierLayer(n_class, n_sample, n_feature)
-#     p_hat = model(X_tch, Q_tch, theta_tch)
-
-#     print(p_hat)
-#     print(model.parameters())
-
-#     for batch_idx, (data, target) in enumerate(train_loader):
-#         print(batch_idx)
-#         print(target)
+    # unittest_3()

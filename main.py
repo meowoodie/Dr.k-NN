@@ -11,7 +11,7 @@ def main():
     # model configurations
     classes     = [0, 1]
     n_class     = 2
-    n_sample    = 20
+    n_sample    = 50
     n_feature   = 10
     max_theta   = 0.1
     batch_size  = 2
