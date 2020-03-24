@@ -4,29 +4,102 @@
 """
 Robust Classifier
 
+NOTE:
+in my conda environment, cvxpy can only be installed via pip. 
+if you need install cvxpy in conda, please ref to the reference below:
+https://stackoverflow.com/questions/41060382/using-pip-to-install-packages-to-anaconda-environment
+
 Dependencies:
 - Python      3.7.6
 - NumPy       1.18.1
 - cvxpy       1.1.0a3
 - PyTorch     1.4.0
 - cvxpylayers 0.1.2
+- arrow       0.13.1
 """
 
 import utils
 import torch 
 import cvxpy as cp
 import numpy as np
+import torch.nn.functional as F
 from cvxpylayers.torch import CvxpyLayer
 
-# class RobustImageClassifier(torch.nn.Module):
-#     """
-#     A Robust Image Classifier based on CNN and Robust Classifier Layer defined below
-#     """
+class RobustImageClassifier(torch.nn.Module):
+    """
+    A Robust Image Classifier based on multiple CNNs and a Robust Classifier Layer defined below
+    """
 
-#     def __init__(self, n_class, n_sample, n_feature):
-#         """
-#         """
-#         super(RobustImageClassifier, self).__init__()
+    def __init__(self, n_class, n_sample, n_feature, 
+        n_pixel=28, in_channel=1, out_channel=7, 
+        kernel_size=3, stride=1, keepprob=0.2):
+        """
+        Args:
+        - n_class:     number of classes
+        - n_sample:    number of sets of samples
+        - n_feature:   size of the output feature (output of CNN)
+        - n_pixel:     number of pixels along one axis for an image (n_pixel * n_pixel) 
+                       28 in default (mnist)
+        - in_channel:  number of in channels for an image
+                       1 in default (mnist)
+        - out_channel: number of out channels from CNN
+                       5 in default
+        - kernel_size: size of the kernel in CNN
+                       3 in default
+        - stride:      the stride for the cross-correlation, a single number or a tuple.
+                       1 in default
+        - keepprob:    keep probability for dropout layer
+                       0.2 in default
+        """
+        super(RobustImageClassifier, self).__init__()
+        # CNN layer 1
+        self.conv1 = torch.nn.Conv2d(
+            in_channels=in_channel, 
+            out_channels=out_channel, 
+            kernel_size=kernel_size, 
+            stride=stride, padding=0)
+        # dropout layer 1
+        self.dropout1 = torch.nn.Dropout2d(keepprob)
+        # fully connected layer 1
+        n_feature_1   = int((n_pixel - kernel_size + stride) / stride)
+        n_feature_2   = int(n_feature_1 / 2)
+        self.fc1      = torch.nn.Linear(out_channel * (n_feature_2**2), n_feature)
+        # robust classifier layer
+        self.rbstclf = RobustClassifierLayer(n_class, n_sample, n_feature)
+    
+    def forward(self, X, Q, theta):
+        """
+        customized forward function.
+        """
+        # CNN layer
+        # NOTE: merge the batch_size dimension and n_sample dimension
+        batch_size = X.shape[0]
+        n_sample   = X.shape[1]
+        X = X.view(batch_size*n_sample, 
+            X.shape[2], X.shape[3], X.shape[4]) # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
+                                                # NOTE: n_feature_1 = (n_pixel - kernel_size + stride) / stride
+        X = self.conv1(X)                       # [batch_size*n_sample, out_channel, n_feature_1, n_feature_1] 
+        X = F.relu(X)
+                                                # NOTE: n_feature_2 = n_feature_1 / kernel_size=2
+        X = F.max_pool2d(X, 2)                  # [batch_size*n_sample, out_channel, n_feature_2, n_feature_1] 
+        X = self.dropout1(X)
+        X = torch.flatten(X, 1)                 # [batch_size*n_sample, out_channel*n_feature_2*n_feature_2] 
+
+        # fully-connected layer
+        X = self.fc1(X)
+        X = F.relu(X)
+        # NOTE: reshape back to batch_size and n_sample
+        X = X.view(batch_size, n_sample, X.shape[-1])
+
+        print(X.shape)
+        print(Q.shape)
+        print(theta.shape)
+        # robust classifier layer
+        p_hat = self.rbstclf(X, Q, theta)
+        print(p_hat.shape)
+        return X
+
+
 
 class RobustClassifierLayer(torch.nn.Module):
     """
@@ -46,12 +119,15 @@ class RobustClassifierLayer(torch.nn.Module):
     def forward(self, X_tch, Q_tch, theta_tch):
         """
         customized forward function. 
-        X_tch is a single batch of the input data and Q_tch is the empirical distribution obtained from the 
-        labels of this batch.
+        X_tch is a single batch of the input data and Q_tch is the empirical distribution obtained from  
+        the labels of this batch.
+
         input:
         - X_tch: [batch_size, n_sample, n_feature]
         - Q_tch: [batch_size, n_class, n_sample]
         - theta_tch: [batch_size, n_class]
+        output:
+        - p_hat: [batch_size, n_class, n_sample]
         """
         C_tch     = self._wasserstein_distance(X_tch)        # [batch_size, n_sample, n_sample]
         gamma_hat = self.cvxpylayer(theta_tch, Q_tch, C_tch) # (n_class [batch_size, n_sample, n_sample])
@@ -134,11 +210,26 @@ class RobustClassifierLayer(torch.nn.Module):
 
 
 
-def train(model, dataloader, optimizer, epoch):
+def train_images():
     """train function"""
-    model.train()
-    for X, _, Q in enumerate(dataloader):
-        
+    # model configurations
+    classes     = [0, 1]
+    n_class     = 2
+    n_sample    = 20
+    n_feature   = 10
+    max_theta   = 0.1
+    batch_size  = 2
+
+    # init dataloader
+    dataloader = utils.dataloader4mnistNclasses(classes, batch_size, n_sample)
+    # init model
+    model = RobustImageClassifier(n_class, n_sample, n_feature)
+    # model.train()
+    for X, _, Q in dataloader:
+        # theta_k for class k
+        theta  = torch.ones(batch_size, n_class) * max_theta
+        output = model(X, Q, theta)
+        break
         # optimizer.zero_grad()
         # output = model(data)
         # loss = F.nll_loss(output, label)
@@ -150,26 +241,6 @@ def train(model, dataloader, optimizer, epoch):
         #         100. * batch_idx / len(train_loader), loss.item()))
 
 if __name__ == "__main__":
-    batch_size = 32 
-    n_class    = 2 
-    n_sample   = 10
-    n_feature  = 5
+    train_images()
 
-    # X_tch     = torch.randn(batch_size, n_sample, n_feature, requires_grad=True)
-    # Q_tch     = torch.randn(batch_size, n_class, n_sample, requires_grad=True)
-    # theta_tch = torch.randn(batch_size, n_class, requires_grad=True)
 
-    # model = RobustClassifierLayer(n_class, n_sample, n_feature)
-    # p_hat = model(X_tch, Q_tch, theta_tch)
-
-    # print(p_hat)
-    # print(model.parameters())
-
-    
-
-    # for batch_idx, (data, target) in enumerate(train_loader):
-    #     print(batch_idx)
-    #     print(target)
-
-    for d, l in data:
-        print(d)

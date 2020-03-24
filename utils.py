@@ -8,6 +8,7 @@ Dependencies:
 - Python      3.7.6
 - NumPy       1.18.1
 - PyTorch     1.4.0
+- arrow       0.13.1
 """
 
 import torch 
@@ -99,7 +100,7 @@ def sortedY2Q(_Y):
         for class_idx in range(n_class):
             _from = N[batch_idx, :class_idx].sum()
             _to   = N[batch_idx, :class_idx+1].sum()
-            n_k   = N[batch_idx, class_idx].double()
+            n_k   = N[batch_idx, class_idx].float()
             Q[batch_idx, class_idx, _from:_to] = 1 / n_k
     return Q
     
