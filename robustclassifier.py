@@ -76,10 +76,11 @@ class RobustImageClassifier(torch.nn.Module):
         """
         customized forward function.
         """
-        # CNN layer
-        # NOTE: merge the batch_size dimension and n_sample dimension
         batch_size = X.shape[0]
         n_sample   = X.shape[1]
+        
+        # CNN layer
+        # NOTE: merge the batch_size dimension and n_sample dimension
         X = X.view(batch_size*n_sample, 
             X.shape[2], X.shape[3], X.shape[4]) # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
                                                 # NOTE: n_feature_1 = (n_pixel - kernel_size + stride) / stride
