@@ -37,13 +37,13 @@ def unittest_2():
     - func: utils.dataloader4mnistNclasses
     """
     classes    = [1, 2]
-    batch_size = 10 
+    batch_size = 20 
     n_sample   = 50
-    dataloader = utils.dataloader4mnistNclasses(classes, batch_size, n_sample)
+    dataloader = utils.Dataloader4MNIST(classes, batch_size, n_sample)
+    print(len(dataloader))
     for batch_idx, (X, Y, Q) in enumerate(dataloader):
-        # print(X.shape)
-        # print(Y)
         print(batch_idx)
+        break
 
 def unittest_1():
     """

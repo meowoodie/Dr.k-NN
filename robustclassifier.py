@@ -219,7 +219,7 @@ def tvloss(p_hat):
 
 
 
-def train(epoch, model, optimizer, dataloader, log_interval=100):
+def train(epoch, model, optimizer, dataloader, log_interval=5):
     """training procedure for one epoch"""
     model.train()
     for batch_idx, (X, _, Q) in enumerate(dataloader):
@@ -229,7 +229,8 @@ def train(epoch, model, optimizer, dataloader, log_interval=100):
         loss.backward()
         optimizer.step()
         if batch_idx % log_interval == 0:
-            print("[%s] Train Epoch: %d [%d]\tLoss: %.3f" % \
-                (arrow.now(), epoch, batch_idx * len(X), loss.item()))
+            print("[%s] Train Epoch: %d [%d/%d]\tLoss: %.3f" % \
+                (arrow.now(), epoch, batch_idx, len(dataloader), loss.item()))
+            
 
 

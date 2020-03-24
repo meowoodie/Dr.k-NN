@@ -16,45 +16,108 @@ import arrow
 import numpy as np
 from torchvision import datasets, transforms
 
-def dataloader4mnistNclasses(classes, batch_size, n_sample):
-    """
-    dataloader for mnist dataset with N selected classes
+class Dataloader4MNIST(torch.utils.data.Dataset):
+    """Face Landmarks dataset."""
 
-    Note: invalid batch (number of appeared classses in the batch is less than the number of 
-    classes speficied in `classes`) will be discarded. 
-    """
-    # download mnist dataset to subfolder named by "data" in the current directory
-    data = datasets.MNIST('data', train=True, download=True,
-        transform=transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ]))
-    indices      = [ idx for idx in range(data.targets.shape[0]) if data.targets[idx] in classes ]
-    data.targets = data.targets[indices]
-    data.data    = data.data[indices]
-    dataloader   = torch.utils.data.DataLoader(data, batch_size=n_sample, shuffle=True)
-    # yield data samples with number of `n_sample` as a single batch.
-    batch_X, batch_Y = [], []
-    for data, target in dataloader:
-        if torch.unique(target).shape[0] == len(classes) and target.shape[0] == n_sample:
-            X = data                              # [n_sample, n_channel, n_xpixel, n_ypixel]
-            Y = target                            # [n_sample]
-            batch_X.append(X) 
-            batch_Y.append(Y)
-        else: 
-            print("[%s] invalid batch with number of classes %d < %d" % \
-                (arrow.now(), torch.unique(target).shape[0], len(classes)))
-        # only yield when each batch has `batch_size` set of data samples.
-        if len(batch_X) >= batch_size:
-            yield_X = torch.stack(batch_X, dim=0) # [batch_size, n_sample, n_channel, n_xpixel, n_ypixel]
-            yield_Y = torch.stack(batch_Y, dim=0) # [batch_size, n_sample]
-            # sort X, Y by class
-            yield_X, yield_Y = sortbyclass(yield_X, yield_Y)
-            # calculate empirical distribution Q
-            yield_Q = sortedY2Q(yield_Y)          # [batch_size, n_class, n_sample]
-            # clear batch
-            batch_X, batch_Y = [], []
-            yield yield_X, yield_Y, yield_Q
+    def __init__(self, classes, batch_size, n_sample, shuffle=True):
+        """
+        Args:
+            csv_file (string): Path to the csv file with annotations.
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        # MNIST dataset
+        self.dataset    = datasets.MNIST("data", train=True, download=True)
+        # configurations
+        self.batch_size = batch_size
+        self.n_sample   = n_sample
+        self.n_channel  = 1
+        self.n_pixel    = self.dataset.data.shape[1]
+        # only keep classes specified in the argument `classes` from the dataset
+        indices              = [ idx 
+            for idx in range(self.dataset.targets.shape[0]) 
+            if self.dataset.targets[idx] in classes ]
+        # shuffle the dataset
+        if shuffle:
+            np.random.shuffle(indices)
+        self.dataset.targets = self.dataset.targets[indices]
+        self.dataset.data    = self.dataset.data[indices]
+        # organize data as sets of samples
+        n                    = int(len(indices) - len(indices) % self.n_sample)
+        n_set                = int(n / self.n_sample)
+        self.dataset.targets = self.dataset.targets[:n].view(n_set, self.n_sample)
+        self.dataset.data    = self.dataset.data[:n].view(n_set, self.n_sample, 1, self.n_pixel, self.n_pixel)
+        # remove sets whose class set are intact.
+        valid_set_indices = []
+        for set_idx in range(n_set):
+            if torch.unique(self.dataset.targets[set_idx]).shape[0] == len(classes):
+                valid_set_indices.append(set_idx)
+        n_valid_set          = int(len(valid_set_indices) - len(valid_set_indices) % self.batch_size)
+        self.n_batch         = int(n_valid_set / self.batch_size)
+        self.dataset.targets = self.dataset.targets[valid_set_indices][:n_valid_set]
+        self.dataset.data    = self.dataset.data[valid_set_indices][:n_valid_set]
+        # normalization
+        self.dataset.data    = (self.dataset.data.float() - torch.min(self.dataset.data).float()) /\
+            (torch.max(self.dataset.data).float() - torch.min(self.dataset.data).float())
+        
+
+    def __len__(self):
+        return self.n_batch
+
+    def __getitem__(self, batch_idx):
+        # batch indices for current batch
+        batch_indices = np.arange(
+            self.batch_size * batch_idx, 
+            self.batch_size * (batch_idx + 1))
+        # get data in current batch
+        X = self.dataset.data[batch_indices]
+        Y = self.dataset.targets[batch_indices]
+        # sort X, Y by class
+        _X, _Y = sortbyclass(X, Y)
+        # calculate empirical distribution Q
+        Q = sortedY2Q(_Y)                               # [batch_size, n_class, n_sample]
+        return _X, _Y, Q
+
+# def dataloader4mnistNclasses(classes, batch_size, n_sample):
+#     """
+#     dataloader for mnist dataset with N selected classes
+
+#     Note: invalid batch (number of appeared classses in the batch is less than the number of 
+#     classes speficied in `classes`) will be discarded. 
+#     """
+#     # download mnist dataset to subfolder named by "data" in the current directory
+#     data = datasets.MNIST('data', train=True, download=True,
+#         transform=transforms.Compose([
+#             transforms.ToTensor(),
+#             transforms.Normalize((0.1307,), (0.3081,))
+#         ]))
+#     indices      = [ idx for idx in range(data.targets.shape[0]) if data.targets[idx] in classes ]
+#     data.targets = data.targets[indices]
+#     data.data    = data.data[indices]
+#     dataloader   = torch.utils.data.DataLoader(data, batch_size=n_sample, shuffle=True)
+#     # yield data samples with number of `n_sample` as a single batch.
+#     batch_X, batch_Y = [], []
+#     for data, target in dataloader:
+#         if torch.unique(target).shape[0] == len(classes) and target.shape[0] == n_sample:
+#             X = data                              # [n_sample, n_channel, n_xpixel, n_ypixel]
+#             Y = target                            # [n_sample]
+#             batch_X.append(X) 
+#             batch_Y.append(Y)
+#         else: 
+#             print("[%s] invalid batch with number of classes %d < %d" % \
+#                 (arrow.now(), torch.unique(target).shape[0], len(classes)))
+#         # only yield when each batch has `batch_size` set of data samples.
+#         if len(batch_X) >= batch_size:
+#             yield_X = torch.stack(batch_X, dim=0) # [batch_size, n_sample, n_channel, n_xpixel, n_ypixel]
+#             yield_Y = torch.stack(batch_Y, dim=0) # [batch_size, n_sample]
+#             # sort X, Y by class
+#             yield_X, yield_Y = sortbyclass(yield_X, yield_Y)
+#             # calculate empirical distribution Q
+#             yield_Q = sortedY2Q(yield_Y)          # [batch_size, n_class, n_sample]
+#             # clear batch
+#             batch_X, batch_Y = [], []
+#             yield yield_X, yield_Y, yield_Q
 
 def sortbyclass(X, Y):
     """
