@@ -79,46 +79,6 @@ class Dataloader4MNIST(torch.utils.data.Dataset):
         Q = sortedY2Q(_Y)                               # [batch_size, n_class, n_sample]
         return _X, _Y, Q
 
-# def dataloader4mnistNclasses(classes, batch_size, n_sample):
-#     """
-#     dataloader for mnist dataset with N selected classes
-
-#     Note: invalid batch (number of appeared classses in the batch is less than the number of 
-#     classes speficied in `classes`) will be discarded. 
-#     """
-#     # download mnist dataset to subfolder named by "data" in the current directory
-#     data = datasets.MNIST('data', train=True, download=True,
-#         transform=transforms.Compose([
-#             transforms.ToTensor(),
-#             transforms.Normalize((0.1307,), (0.3081,))
-#         ]))
-#     indices      = [ idx for idx in range(data.targets.shape[0]) if data.targets[idx] in classes ]
-#     data.targets = data.targets[indices]
-#     data.data    = data.data[indices]
-#     dataloader   = torch.utils.data.DataLoader(data, batch_size=n_sample, shuffle=True)
-#     # yield data samples with number of `n_sample` as a single batch.
-#     batch_X, batch_Y = [], []
-#     for data, target in dataloader:
-#         if torch.unique(target).shape[0] == len(classes) and target.shape[0] == n_sample:
-#             X = data                              # [n_sample, n_channel, n_xpixel, n_ypixel]
-#             Y = target                            # [n_sample]
-#             batch_X.append(X) 
-#             batch_Y.append(Y)
-#         else: 
-#             print("[%s] invalid batch with number of classes %d < %d" % \
-#                 (arrow.now(), torch.unique(target).shape[0], len(classes)))
-#         # only yield when each batch has `batch_size` set of data samples.
-#         if len(batch_X) >= batch_size:
-#             yield_X = torch.stack(batch_X, dim=0) # [batch_size, n_sample, n_channel, n_xpixel, n_ypixel]
-#             yield_Y = torch.stack(batch_Y, dim=0) # [batch_size, n_sample]
-#             # sort X, Y by class
-#             yield_X, yield_Y = sortbyclass(yield_X, yield_Y)
-#             # calculate empirical distribution Q
-#             yield_Q = sortedY2Q(yield_Y)          # [batch_size, n_class, n_sample]
-#             # clear batch
-#             batch_X, batch_Y = [], []
-#             yield yield_X, yield_Y, yield_Q
-
 def sortbyclass(X, Y):
     """
     return the sorted data _X and label _Y by their classes (value of Y)
