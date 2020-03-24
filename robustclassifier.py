@@ -17,7 +17,6 @@ import torch
 import cvxpy as cp
 import numpy as np
 from cvxpylayers.torch import CvxpyLayer
-from torchvision import datasets, transforms
 
 # class RobustImageClassifier(torch.nn.Module):
 #     """
@@ -94,7 +93,7 @@ class RobustClassifierLayer(torch.nn.Module):
         see reference below for the binary case: 
         http://papers.nips.cc/paper/8015-robust-hypothesis-testing-using-wasserstein-uncertainty-sets
         """
-        # TODO: 
+        # NOTE: 
         # cvxpy currently doesn't support N-dim variables, see discussion and solution below:
         # * how to build N-dim variables?
         #   https://github.com/cvxgrp/cvxpy/issues/198
@@ -133,20 +132,22 @@ class RobustClassifierLayer(torch.nn.Module):
         # to convert the output tensor into a normal shape, i.e., [batch_size, n_class, n_sample, n_sample]
         return CvxpyLayer(prob, parameters=[theta, Q, C], variables=gamma)
 
-def train(model, train_loader, optimizer, epoch):
+
+
+def train(model, dataloader, optimizer, epoch):
     """train function"""
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        # data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
+    for X, _, Q in enumerate(dataloader):
+        
+        # optimizer.zero_grad()
+        # output = model(data)
+        # loss = F.nll_loss(output, label)
+        # loss.backward()
+        # optimizer.step()
+        # if batch_idx % args.log_interval == 0:
+        #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+        #         epoch, batch_idx * len(data), len(train_loader.dataset),
+        #         100. * batch_idx / len(train_loader), loss.item()))
 
 if __name__ == "__main__":
     batch_size = 32 
@@ -164,13 +165,7 @@ if __name__ == "__main__":
     # print(p_hat)
     # print(model.parameters())
 
-    train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
-        batch_size=batch_size, shuffle=True)
+    
 
     # for batch_idx, (data, target) in enumerate(train_loader):
     #     print(batch_idx)
