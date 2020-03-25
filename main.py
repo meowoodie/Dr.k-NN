@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import torch
 import utils
 import robustclassifier as rc
 import torch.optim as optim
