@@ -14,6 +14,8 @@ Dependencies:
 import torch 
 import arrow
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from torchvision import datasets, transforms
 
 class Dataloader4MNIST(torch.utils.data.Dataset):
@@ -126,4 +128,3 @@ def sortedY2Q(_Y):
             n_k   = N[batch_idx, class_idx].float()
             Q[batch_idx, class_idx, _from:_to] = 1 / n_k
     return Q
-    

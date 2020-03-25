@@ -25,6 +25,12 @@ def main():
     dataloader = utils.Dataloader4MNIST(classes, batch_size, n_sample)
     # init model
     model      = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
+
+    # # trainable parameters
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name, param.data)
+
     optimizer  = optim.Adadelta(model.parameters(), lr=lr)
     scheduler  = StepLR(optimizer, step_size=1, gamma=gamma)
     for epoch in range(epochs):

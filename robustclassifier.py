@@ -24,6 +24,7 @@ import torch
 import cvxpy as cp
 import numpy as np
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from cvxpylayers.torch import CvxpyLayer
 
 class RobustImageClassifier(torch.nn.Module):
@@ -58,19 +59,24 @@ class RobustImageClassifier(torch.nn.Module):
         self.n_class   = n_class
         self.max_theta = max_theta
         # CNN layer 1
-        self.conv1 = torch.nn.Conv2d(
+        self.conv1     = torch.nn.Conv2d(
             in_channels=in_channel, 
             out_channels=out_channel, 
             kernel_size=kernel_size, 
             stride=stride, padding=0)
         # dropout layer 1
-        self.dropout1 = torch.nn.Dropout2d(keepprob)
+        self.dropout1  = torch.nn.Dropout2d(keepprob)
         # fully connected layer 1
-        n_feature_1   = int((n_pixel - kernel_size + stride) / stride)
-        n_feature_2   = int(n_feature_1 / 2)
-        self.fc1      = torch.nn.Linear(out_channel * (n_feature_2**2), n_feature)
+        n_feature_1    = int((n_pixel - kernel_size + stride) / stride)
+        n_feature_2    = int(n_feature_1 / 2)
+        self.fc1       = torch.nn.Linear(out_channel * (n_feature_2**2), n_feature)
         # robust classifier layer
-        self.rbstclf = RobustClassifierLayer(n_class, n_sample, n_feature)
+        # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
+        #       since it is one of the attributes defined in the model.
+        self.theta     = torch.nn.Parameter(torch.ones(self.n_class).float() * self.max_theta)
+        self.theta.requires_grad = True
+        # self.theta     = torch.ones(self.n_class) * self.max_theta
+        self.rbstclf   = RobustClassifierLayer(n_class, n_sample, n_feature)
     
     def forward(self, X, Q):
         """
@@ -78,7 +84,7 @@ class RobustImageClassifier(torch.nn.Module):
         """
         batch_size = X.shape[0]
         n_sample   = X.shape[1]
-        
+
         # CNN layer
         # NOTE: merge the batch_size dimension and n_sample dimension
         X = X.view(batch_size*n_sample, 
@@ -98,8 +104,9 @@ class RobustImageClassifier(torch.nn.Module):
         X = X.view(batch_size, n_sample, X.shape[-1]) # [batch_size, n_sample, n_feature]
 
         # robust classifier layer
-        theta = torch.ones(batch_size, self.n_class) * self.max_theta
-        p_hat = self.rbstclf(X, Q, theta)       # [batch_size, n_class, n_sample]
+        # theta = torch.ones(batch_size, self.n_class, requires_grad=True) * self.max_theta
+        theta = self.theta.unsqueeze(0).repeat([batch_size, 1]) # [batch_size, n_class]
+        p_hat = self.rbstclf(X, Q, theta)                       # [batch_size, n_class, n_sample]
         return p_hat
 
 
@@ -228,6 +235,7 @@ def train(epoch, model, optimizer, dataloader, log_interval=5):
         p_hat = model(X, Q)
         loss  = tvloss(p_hat)
         loss.backward()
+        # NOTE: gradient for loss is expected to be None, since it is not leaf node. (it's root node)
         optimizer.step()
         if batch_idx % log_interval == 0:
             print("[%s] Train Epoch: %d [%d/%d]\tLoss: %.3f" % \
