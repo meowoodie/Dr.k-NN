@@ -202,7 +202,7 @@ class RobustClassifierLayer(torch.nn.Module):
         C     = cp.Parameter((n_sample, n_sample))
 
         # Constraints
-        cons = []
+        cons = [ g >= 0. for g in gamma ]
         for k in range(n_class):
             cons += [cp.sum(cp.multiply(gamma[k], C)) <= theta[k]]
             for l in range(n_sample):
