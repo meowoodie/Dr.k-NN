@@ -39,11 +39,11 @@ def unittest_2():
     classes    = [1, 2]
     batch_size = 20 
     n_sample   = 50
-    dataloader = utils.Dataloader4MNIST(classes, batch_size, n_sample)
+    dataloader = utils.Dataloader4mnist(classes, batch_size, n_sample, is_train=False)
     print(len(dataloader))
-    for batch_idx, (X, Y, Q) in enumerate(dataloader):
-        print(batch_idx)
-        break
+    # for batch_idx, (X, Y, Q) in enumerate(dataloader):
+    #     print(batch_idx)
+    #     break
 
 def unittest_1():
     """

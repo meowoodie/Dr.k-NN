@@ -18,10 +18,10 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from torchvision import datasets, transforms
 
-class Dataloader4MNIST(torch.utils.data.Dataset):
+class Dataloader4mnist(torch.utils.data.Dataset):
     """Dataloader for MNIST"""
 
-    def __init__(self, classes, batch_size, n_sample, shuffle=True):
+    def __init__(self, classes, batch_size, n_sample, shuffle=True, is_train=True, train_ratio=0.9):
         """
         Args:
         - classes:    selected classes in the dataset (from 0 to 9)
@@ -35,10 +35,11 @@ class Dataloader4MNIST(torch.utils.data.Dataset):
         self.n_sample   = n_sample
         self.n_channel  = 1
         self.n_pixel    = self.dataset.data.shape[1]
+        # for train or for test?
+        n               = self.dataset.targets.shape[0]
+        data_range      = range(0, int(n * train_ratio)) if is_train else range(int(n * train_ratio), n)
         # only keep classes specified in the argument `classes` from the dataset
-        indices              = [ idx 
-            for idx in range(self.dataset.targets.shape[0]) 
-            if self.dataset.targets[idx] in classes ]
+        indices              = [ idx for idx in data_range if self.dataset.targets[idx] in classes ]
         # shuffle the dataset
         if shuffle:
             np.random.shuffle(indices)
