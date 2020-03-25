@@ -27,6 +27,52 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from cvxpylayers.torch import CvxpyLayer
 
+def tvloss(p_hat):
+    """TV loss"""
+    # p_max, _ = torch.max(p_hat, dim=1) # [batch_size, n_sample]
+    # return p_max.sum(dim=1).mean()     # scalar
+    p_min, _ = torch.min(p_hat, dim=1) # [batch_size, n_sample]
+    return p_min.sum(dim=1).mean()     # scalar
+
+def train(model, trainloader, optimizer, epoch, log_interval=5):
+    """training procedure for one epoch"""
+    model.train()
+    for batch_idx, (X, _, Q) in enumerate(trainloader):
+        optimizer.zero_grad()
+        p_hat = model(X, Q)
+        loss  = tvloss(p_hat)
+        loss.backward()
+        # NOTE: gradient for loss is expected to be None, since it is not leaf node. (it's root node)
+        optimizer.step()
+        if batch_idx % log_interval == 0:
+            print("[%s] Train Epoch: %d [%d/%d]\tLoss: %.3f" % \
+                (arrow.now(), epoch, batch_idx, len(trainloader), loss.item()))
+
+def test(model, testloader):
+    """testing procedure"""
+    model.eval()
+    test_loss = 0
+    n_correct = 0
+    with torch.no_grad():
+        for batch_idx, (X, Y, Q) in enumerate(testloader):
+            p_hat      = model(X, Q)
+            test_loss += tvloss(p_hat)
+            # get the index of the max probability
+            test_pred  = p_hat.argmax(dim=1)
+            n_correct += test_pred.eq(Y).sum().item()
+
+    n_batch    = len(testloader)
+    batch_size = Y.shape[0]
+    n_sample   = Y.shape[1]
+    n          = n_batch * batch_size * n_sample
+    test_loss /= n_batch
+    accuracy   = n_correct / n
+
+    print("[%s] Test set: Average loss: %.3f, Accuracy: %.3f (%d samples)" % \
+        (arrow.now(), test_loss, accuracy, n))
+
+
+
 class RobustImageClassifier(torch.nn.Module):
     """
     A Robust Image Classifier based on multiple CNNs and a Robust Classifier Layer defined below
@@ -209,7 +255,8 @@ class RobustClassifierLayer(torch.nn.Module):
                 cons += [cp.sum(gamma[k], axis=1)[l] == Q[k, l]]
 
         # Problem setup
-        obj   = cp.Minimize(cp.sum(cp.max(p, axis=0)))
+        # obj   = cp.Minimize(cp.sum(cp.max(p, axis=0)))
+        obj   = cp.Maximize(cp.sum(cp.min(p, axis=0)))
         prob  = cp.Problem(obj, cons)
         assert prob.is_dpp()
 
@@ -217,29 +264,3 @@ class RobustClassifierLayer(torch.nn.Module):
         # stack operation ('torch.stack(gamma_hat, axis=1)') is needed for the output of this layer
         # to convert the output tensor into a normal shape, i.e., [batch_size, n_class, n_sample, n_sample]
         return CvxpyLayer(prob, parameters=[theta, Q, C], variables=gamma)
-
-
-
-def tvloss(p_hat):
-    """TV loss"""
-    p_max, _ = torch.max(p_hat, dim=1) # [batch_size, n_sample]
-    return p_max.sum(dim=1).mean()     # scalar
-
-
-
-def train(epoch, model, optimizer, dataloader, log_interval=5):
-    """training procedure for one epoch"""
-    model.train()
-    for batch_idx, (X, _, Q) in enumerate(dataloader):
-        optimizer.zero_grad()
-        p_hat = model(X, Q)
-        loss  = tvloss(p_hat)
-        loss.backward()
-        # NOTE: gradient for loss is expected to be None, since it is not leaf node. (it's root node)
-        optimizer.step()
-        if batch_idx % log_interval == 0:
-            print("[%s] Train Epoch: %d [%d/%d]\tLoss: %.3f" % \
-                (arrow.now(), epoch, batch_idx, len(dataloader), loss.item()))
-            
-
-

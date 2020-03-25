@@ -77,7 +77,7 @@ class Dataloader4mnist(torch.utils.data.Dataset):
         # sort X, Y by class
         _X, _Y = sortbyclass(X, Y)
         # calculate empirical distribution Q
-        Q = sortedY2Q(_Y)                               # [batch_size, n_class, n_sample]
+        Q = sortedY2Q(_Y) # [batch_size, n_class, n_sample]
         return _X, _Y, Q
 
 
