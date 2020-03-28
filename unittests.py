@@ -41,9 +41,9 @@ def unittest_2():
     n_sample   = 50
     dataloader = utils.Dataloader4mnist(classes, batch_size, n_sample, is_train=False)
     print(len(dataloader))
-    # for batch_idx, (X, Y, Q) in enumerate(dataloader):
-    #     print(batch_idx)
-    #     break
+    for batch_idx, (X, Y) in enumerate(dataloader):
+        print(X.shape)
+        break
 
 def unittest_1():
     """
