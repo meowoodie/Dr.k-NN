@@ -12,8 +12,34 @@ Dependencies:
 
 import utils
 import torch 
+import dataloader
 import numpy as np
 import robustclassifier
+
+def unittest_4():
+    """
+    UNITTEST 4
+    - func: utils.k_nearest_train_neighbors
+    """
+    # model configurations
+    classes     = [0, 1]
+    n_class     = 2
+    n_sample    = 30
+    n_feature   = 10
+    max_theta   = 1e-2
+    batch_size  = 10
+    # training parameters
+    epochs      = 2
+    lr          = 1e-2
+    gamma       = 0.7
+
+    # init model
+    model       = robustclassifier.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
+    # train and test
+    trainloader = dataloader.Dataloader4mnist(classes, batch_size, n_sample)
+    testloader  = dataloader.Dataloader4mnist(classes, batch_size, n_sample, is_train=False)
+    # get K nearest train neighbors for testset
+    utils.k_nearest_train_neighbors(model, trainloader, testloader, 5)
 
 def unittest_3():
     """
@@ -37,12 +63,10 @@ def unittest_2():
     - func: utils.dataloader4mnistNclasses
     """
     classes    = [1, 2]
-    batch_size = 20 
-    n_sample   = 50
-    dataloader = utils.Dataloader4mnist(classes, batch_size, n_sample, is_train=False)
-    print(len(dataloader))
-    for batch_idx, (X, Y) in enumerate(dataloader):
-        print(X.shape)
+    batch_size = 5 
+    n_sample   = 15
+    dl         = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=20)
+    for batch_idx, (x, y) in enumerate(dl):
         break
 
 def unittest_1():
@@ -81,3 +105,4 @@ if __name__ == "__main__":
     # unittest_1()
     unittest_2()
     # unittest_3()
+    # unittest_4()
