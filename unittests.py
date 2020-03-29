@@ -19,7 +19,7 @@ import robustclassifier
 def unittest_4():
     """
     UNITTEST 4
-    - func: utils.k_nearest_train_neighbors
+    - func: robustclassifier.test
     """
     # model configurations
     classes     = [0, 1]
@@ -106,3 +106,4 @@ if __name__ == "__main__":
     # unittest_2()
     # unittest_3()
     unittest_4()
+    pass

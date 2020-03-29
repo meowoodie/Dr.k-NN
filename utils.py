@@ -14,6 +14,45 @@ Dependencies:
 import torch 
 import arrow
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+
+np.random.seed(1)
+
+def visualize_embedding(H, p_hat, perplexity=20):
+    """
+    Visualize data embedding on a 2D space using TSNE. 
+    
+    input
+    - H:     [n_sample, n_feature]
+    - p_hat: [n_class, n_sample]
+    """
+    # configuration
+    n     = H.shape[0]
+    H     = H.numpy()
+    p_hat = p_hat.numpy()
+    # fit TSNE
+    tsne  = TSNE(n_components=2, init='random', random_state=0, perplexity=perplexity)
+    E2D   = tsne.fit_transform(H)
+    # plot 
+    fig, axs = plt.subplots(1, 2)
+    cm       = plt.cm.get_cmap('RdYlBu')
+    ax1      = axs[0]
+    ax2      = axs[1]
+    # # plot embedding colored by their labels
+    # ax1.scatter(E2D[:int(n/2), 0], E2D[:int(n/2), 1], c="b")
+    # ax1.scatter(E2D[int(n/2):, 0], E2D[int(n/2):, 1], c="r")
+    # # plot embedding colored by p_hat
+    # p_hat = p_hat[0] / (p_hat[0] + p_hat[1])
+    # ax2.scatter(E2D[:, 0], E2D[:, 1], c=p_hat, vmin=0, vmax=1, cmap=cm)
+    # plt.savefig("results/scatter_%s.pdf" % arrow.now())  
+
+    # plot embedding colored by their labels
+    cm1 = plt.cm.get_cmap('Reds')
+    cm2 = plt.cm.get_cmap('Blues')
+    ax1.scatter(E2D[:, 0], E2D[:, 1], c=p_hat[0, :], vmin=p_hat[0, :].min(), vmax=p_hat[0, :].max(), cmap=cm1)
+    ax2.scatter(E2D[:, 0], E2D[:, 1], c=p_hat[1, :], vmin=p_hat[1, :].min(), vmax=p_hat[1, :].max(), cmap=cm2)
+    plt.savefig("results/scatter_%s.pdf" % arrow.now()) 
 
 def sortedY2Q(Y):
     """

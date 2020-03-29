@@ -63,8 +63,8 @@ def test(model, trainloader, testloader, K):
 
     input
     - model:       torch model
-    - trainloader: X: (n_batch, [batch_size, n_sample, in_channel, n_pixel, n_pixel])
-    - testloader:  x: (n_test_sample, [in_channel, n_pixel, n_pixel])
+    - trainloader: the entire training data of the data loader 
+    - testloader:  the entire testing data of the data loader
     output
     - k_neighbors: [n_test_sample, K]
     - H_train:     [n_train_sample, n_feature]
@@ -94,8 +94,8 @@ def test(model, trainloader, testloader, K):
     model.eval()
     with torch.no_grad():
         Q       = utils.sortedY2Q(Y_train)                # [1, n_class, n_sample]
-        H_train = model.img2vec(X_train)                  # [n_train_sample, n_feature]
-        H_test  = model.img2vec(X_test)                   # [n_test_sample, n_feature]
+        H_train = model.data2vec(X_train)                 # [n_train_sample, n_feature]
+        H_test  = model.data2vec(X_test)                  # [n_test_sample, n_feature]
         theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
         p_hat   = evaluate_p_hat(
             H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
@@ -118,7 +118,8 @@ def test(model, trainloader, testloader, K):
         
     print("[%s] Test set: Average loss: %.3f, Accuracy: %.3f (%d samples)" % \
         (arrow.now(), test_loss, accuracy, len(testloader)))
-    # return H_train, test_pred
+
+    utils.visualize_embedding(H_train, p_hat)
 
 
 
@@ -154,7 +155,7 @@ class RobustImageClassifier(torch.nn.Module):
         self.n_class   = n_class
         self.max_theta = max_theta
         # Image to Vec layer
-        self.img2vec   = nn.Image2Vec(n_feature, 
+        self.data2vec  = nn.Image2Vec(n_feature, 
             n_pixel, in_channel, out_channel, kernel_size, stride, keepprob)
         # robust classifier layer
         # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
@@ -182,7 +183,7 @@ class RobustImageClassifier(torch.nn.Module):
         # NOTE: merge the batch_size dimension and n_sample dimension
         X = X.view(batch_size*n_sample, 
             X.shape[2], X.shape[3], X.shape[4])       # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
-        X = self.img2vec(X)                           # [batch_size*n_sample, n_feature]
+        X = self.data2vec(X)                          # [batch_size*n_sample, n_feature]
                                                       # NOTE: reshape back to batch_size and n_sample
         X = X.view(batch_size, n_sample, X.shape[-1]) # [batch_size, n_sample, n_feature]
 
