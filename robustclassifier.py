@@ -34,42 +34,91 @@ def tvloss(p_hat):
     p_min, _ = torch.min(p_hat, dim=1) # [batch_size, n_sample]
     return p_min.sum(dim=1).mean()     # scalar
 
-def train(model, trainloader, optimizer, epoch, log_interval=5):
+def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interval=10):
     """training procedure for one epoch"""
-    model.train()
-    for batch_idx, (X, _, Q) in enumerate(trainloader):
-        optimizer.zero_grad()
-        p_hat, _ = model(X, Q)
-        loss     = tvloss(p_hat)
-        loss.backward()
-        # NOTE: gradient for loss is expected to be None, since it is not leaf node. (it's root node)
-        optimizer.step()
+    # NOTE: gradient for loss is expected to be None, 
+    #       since it is not leaf node. (it's root node)
+    for batch_idx, (X, Y) in enumerate(trainloader):
+        model.train()
+        Q = utils.sortedY2Q(Y)   # calculate empirical distribution based on labels
+        optimizer.zero_grad()    # init optimizer (set gradient to be zero)
+        p_hat = model(X, Q)      # inference
+        loss  = tvloss(p_hat)    # calculate tv loss
+        loss.backward()          # gradient descent
+        optimizer.step()         # update optimizer
         if batch_idx % log_interval == 0:
-            print("[%s] Train Epoch: %d [%d/%d]\tLoss: %.3f" % \
-                (arrow.now(), epoch, batch_idx, len(trainloader), loss.item()))
+            print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
+            # TODO: temporarily place test right here, will remove it in the end.
+            if testloader is not None:
+                test(model, trainloader, testloader, K=5)
+        if batch_idx > n_iter:
+            break
+        
 
-def test(model, testloader):
-    """testing procedure"""
+def test(model, trainloader, testloader, K):
+    """
+    calculate the pairwise distance between the data points from the test set and the train set, 
+    respectively, and return the K-nearest neighbors from the train set for each data point in 
+    the test set.
+
+    input
+    - model:       torch model
+    - trainloader: X: (n_batch, [batch_size, n_sample, in_channel, n_pixel, n_pixel])
+    - testloader:  x: (n_test_sample, [in_channel, n_pixel, n_pixel])
+    output
+    - k_neighbors: [n_test_sample, K]
+    - H_train:     [n_train_sample, n_feature]
+    """
+    # calculate pairwise l2 distance between X and Y
+    def pairwise_dist(X, Y):
+        X_norm = (X**2).sum(dim=1).view(-1, 1)            # [n_xsample, 1]
+        Y_t    = torch.transpose(Y, 0, 1)                 # [n_feature, n_ysample]
+        Y_norm = (Y**2).sum(dim=1).view(1, -1)            # [1, n_ysample]
+        dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
+        return dist
+
+    # given hidden embedding, evaluate corresponding p_hat using the output of the robust classifier layer
+    def evaluate_p_hat(H, Q, theta):
+        n_class, n_sample, n_feature = theta.shape[1], H.shape[1], H.shape[2]
+        rbstclf = RobustClassifierLayer(n_class, n_sample, n_feature)
+        return rbstclf(H, Q, theta).data
+
+    # fetch data from trainset and testset
+    X_train = trainloader.X.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
+    Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
+    X_test  = testloader.X.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
+    Y_test  = testloader.Y                                # [n_test_sample]
+
+    # get H (embeddings) and p_hat for trainset and testset
+    # and calculate p_hat
     model.eval()
-    test_loss = 0
-    n_correct = 0
     with torch.no_grad():
-        for batch_idx, (X, Y, _) in enumerate(testloader):
-            p_hat, X   = model(X, Q)
-            test_loss += tvloss(p_hat)
-            # get the index of the max probability
-            test_pred  = p_hat.argmax(dim=1)
-            n_correct += test_pred.eq(Y).sum().item()
+        Q       = utils.sortedY2Q(Y_train)                # [1, n_class, n_sample]
+        H_train = model.img2vec(X_train)                  # [n_train_sample, n_feature]
+        H_test  = model.img2vec(X_test)                   # [n_test_sample, n_feature]
+        theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
+        p_hat   = evaluate_p_hat(
+            H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
+        
+    # find the indices of k-nearest neighbor in trainset
+    dist   = pairwise_dist(H_test, H_train)
+    dist  *= -1
+    _, knb = torch.topk(dist, K, dim=1)                   # [n_test_sample, K]
 
-    n_batch    = len(testloader)
-    batch_size = Y.shape[0]
-    n_sample   = Y.shape[1]
-    n          = n_batch * batch_size * n_sample
-    test_loss /= n_batch
-    accuracy   = n_correct / n
-
+    # calculate the class marginal probability (p_hat) for each test sample
+    p_hat_test = torch.stack(
+        [ p_hat[:, neighbors].sum(dim=1) 
+            for neighbors in knb ], dim=0).t()            # [n_class, n_test_sample]
+    # calculate tv loss for test samples
+    test_loss  = tvloss(p_hat_test.unsqueeze(0))
+    # calculate accuracy
+    test_pred  = p_hat_test.argmax(dim=0)
+    n_correct  = test_pred.eq(Y_test).sum().item()
+    accuracy   = n_correct / len(testloader)
+        
     print("[%s] Test set: Average loss: %.3f, Accuracy: %.3f (%d samples)" % \
-        (arrow.now(), test_loss, accuracy, n))
+        (arrow.now(), test_loss, accuracy, len(testloader)))
+    # return H_train, test_pred
 
 
 
@@ -141,7 +190,7 @@ class RobustImageClassifier(torch.nn.Module):
         # theta = torch.ones(batch_size, self.n_class, requires_grad=True) * self.max_theta
         theta = self.theta.unsqueeze(0).repeat([batch_size, 1]) # [batch_size, n_class]
         p_hat = self.rbstclf(X, Q, theta)                       # [batch_size, n_class, n_sample]
-        return p_hat, X
+        return p_hat
 
 
 
