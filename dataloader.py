@@ -17,6 +17,12 @@ class MiniMnist(torch.utils.data.Dataset):
 
     This data loader only utilizes a very small portion of data in MNIST, which contains `N` images for each category (`2 * N` in total). Every iteration, the data loader would yield a batch of sample sets, where 
     each sample set contains `n_sample` samples and each class in this set at least has one sample. 
+
+    You may be able to access:
+    - self.data and self.targets for the whole dataset in MNIST
+    - self.X and self.Y for the selected mini dataset
+
+    or iterate the dataloader to access the mini dataset in an iterative fashion.
     """
 
     def __init__(self, classes, batch_size, n_sample, is_train=True, N=50):
@@ -50,6 +56,11 @@ class MiniMnist(torch.utils.data.Dataset):
             self.ids.append(indices[:N])
         # ids contains the indices of selected samples for each class
         self.ids = np.array(self.ids)    # [n_class, N]
+
+        # for accessing selected data more easier (X, Y have been correctly ordered)
+        indices = np.concatenate(self.ids, axis=0)
+        self.X  = self.data[indices]
+        self.Y  = self.targets[indices]
 
     def __len__(self):
         # calculate the number of all possible combinations

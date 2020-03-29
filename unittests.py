@@ -24,7 +24,7 @@ def unittest_4():
     # model configurations
     classes     = [0, 1]
     n_class     = 2
-    n_sample    = 30
+    n_sample    = 10
     n_feature   = 10
     max_theta   = 1e-2
     batch_size  = 10
@@ -36,10 +36,10 @@ def unittest_4():
     # init model
     model       = robustclassifier.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
     # train and test
-    trainloader = dataloader.Dataloader4mnist(classes, batch_size, n_sample)
-    testloader  = dataloader.Dataloader4mnist(classes, batch_size, n_sample, is_train=False)
+    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=20)
+    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=15)
     # get K nearest train neighbors for testset
-    utils.k_nearest_train_neighbors(model, trainloader, testloader, 5)
+    robustclassifier.test(model, trainloader, testloader, K=5)
 
 def unittest_3():
     """
@@ -103,6 +103,6 @@ def unittest_1():
 
 if __name__ == "__main__":
     # unittest_1()
-    unittest_2()
+    # unittest_2()
     # unittest_3()
-    # unittest_4()
+    unittest_4()
