@@ -107,7 +107,7 @@ def test(model, trainloader, testloader, K):
 
     # calculate the class marginal probability (p_hat) for each test sample
     p_hat_test = torch.stack(
-        [ p_hat[:, neighbors].sum(dim=1) 
+        [ p_hat[:, neighbors].mean(dim=1) 
             for neighbors in knb ], dim=0).t()            # [n_class, n_test_sample]
     # calculate tv loss for test samples
     test_loss  = tvloss(p_hat_test.unsqueeze(0))
