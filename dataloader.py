@@ -64,10 +64,11 @@ class MiniMnist(torch.utils.data.Dataset):
 
     def __len__(self):
         # calculate the number of all possible combinations
-        return 2 * self.N
+        return len(self.classes) * self.N
 
     def __str__(self):
-        return "Mini MNIST dataset contains %d images with %d classes. For the training, each batch includes %d sets of images, where each set has %d images." 
+        return "Mini MNIST dataset contains %d images with %d classes. For the training, each batch includes %d sets of images, where each set has %d images." % \
+            (len(self.classes) * self.N, len(self.classes), self.batch_size, self.n_sample)
 
     def __getitem__(self, _):
         X, Y = [], []

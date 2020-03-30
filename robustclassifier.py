@@ -119,7 +119,7 @@ def test(model, trainloader, testloader, K):
     print("[%s] Test set: Average loss: %.3f, Accuracy: %.3f (%d samples)" % \
         (arrow.now(), test_loss, accuracy, len(testloader)))
 
-    utils.visualize_embedding(H_train, p_hat)
+    utils.visualize_embedding(H_test, p_hat_test)
 
 
 
