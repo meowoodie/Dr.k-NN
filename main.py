@@ -11,9 +11,9 @@ from torch.optim.lr_scheduler import StepLR
 def main():
     """train function"""
     # model configurations
-    classes     = [0, 1]
-    n_class     = 2
-    n_sample    = 15
+    classes     = [0, 1, 2]
+    n_class     = 3
+    n_sample    = 12
     n_feature   = 10
     max_theta   = 1e-2
     batch_size  = 10
@@ -24,7 +24,7 @@ def main():
 
     # init model
     model       = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
-    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=20)
+    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=15)
     testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=100)
     print("[%s]\n%s" % (arrow.now(), trainloader))
 

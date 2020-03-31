@@ -64,10 +64,11 @@ def unittest_2():
     """
     classes    = [0, 1, 2, 3, 4, 5]
     batch_size = 5 
-    n_sample   = 15
+    n_sample   = 12
     dl         = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=20)
     for batch_idx, (x, y) in enumerate(dl):
         print(y)
+        # print(len(y[0]))
         # break
 
 def unittest_1():

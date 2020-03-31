@@ -28,17 +28,33 @@ def visualize_embedding(H, p_hat, perplexity=20):
     - p_hat: [n_class, n_sample]
     """
     # configuration
-    n     = H.shape[0]
-    H     = H.numpy()
-    p_hat = p_hat.numpy()
+    n_class  = p_hat.shape[0] 
+    n        = H.shape[0]
+    H        = H.numpy()
+    p_hat    = p_hat.numpy()
     # fit TSNE
-    tsne  = TSNE(n_components=2, init='random', random_state=0, perplexity=perplexity)
-    E2D   = tsne.fit_transform(H)
+    tsne     = TSNE(n_components=2, init='random', random_state=0, perplexity=perplexity)
+    E2D      = tsne.fit_transform(H)
+
     # plot 
-    fig, axs = plt.subplots(1, 2)
-    cm       = plt.cm.get_cmap('RdYlBu')
-    ax1      = axs[0]
-    ax2      = axs[1]
+    fig, axs = plt.subplots(1, n_class)
+    # ax 
+    # ax1      = axs[0]
+    # ax2      = axs[1]
+    # plot embedding colored by their labels
+    # cm1 = plt.cm.get_cmap('Reds')
+    # cm2 = plt.cm.get_cmap('Blues')
+    cms = [ plt.cm.get_cmap(c) for c in ['Reds', 'Blues', 'Greens'] ]
+
+    for i in range(n_class):
+        axs[i].scatter(E2D[:, 0], E2D[:, 1], c=p_hat[i, :], vmin=p_hat[i, :].min(), vmax=p_hat[i, :].max(), cmap=cms[i])
+    plt.savefig("results/scatter_%s.pdf" % arrow.now())
+
+    # # plot 
+    # fig, axs = plt.subplots(1, 2)
+    # cm       = plt.cm.get_cmap('RdYlBu')
+    # ax1      = axs[0]
+    # ax2      = axs[1]
     # # plot embedding colored by their labels
     # ax1.scatter(E2D[:int(n/2), 0], E2D[:int(n/2), 1], c="b")
     # ax1.scatter(E2D[int(n/2):, 0], E2D[int(n/2):, 1], c="r")
@@ -46,13 +62,6 @@ def visualize_embedding(H, p_hat, perplexity=20):
     # p_hat = p_hat[0] / (p_hat[0] + p_hat[1])
     # ax2.scatter(E2D[:, 0], E2D[:, 1], c=p_hat, vmin=0, vmax=1, cmap=cm)
     # plt.savefig("results/scatter_%s.pdf" % arrow.now())  
-
-    # plot embedding colored by their labels
-    cm1 = plt.cm.get_cmap('Reds')
-    cm2 = plt.cm.get_cmap('Blues')
-    ax1.scatter(E2D[:, 0], E2D[:, 1], c=p_hat[0, :], vmin=p_hat[0, :].min(), vmax=p_hat[0, :].max(), cmap=cm1)
-    ax2.scatter(E2D[:, 0], E2D[:, 1], c=p_hat[1, :], vmin=p_hat[1, :].min(), vmax=p_hat[1, :].max(), cmap=cm2)
-    plt.savefig("results/scatter_%s.pdf" % arrow.now()) 
 
 def sortedY2Q(Y):
     """

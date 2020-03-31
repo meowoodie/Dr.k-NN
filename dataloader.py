@@ -104,7 +104,7 @@ class MiniMnist(torch.utils.data.Dataset):
         # convert combinations to numbers of samples we need to split
         n_sampless = []
         for pos in combs:
-            pos = [0] + list(pos) + [self.n_sample - 1]
-            n_samples = [ pos[i+1] - pos[i] + 1 for i in range(len(self.classes)) ]
+            pos = [0] + list(pos) + [self.n_sample]
+            n_samples = [ pos[i+1] - pos[i] for i in range(len(self.classes)) ]
             n_sampless.append(n_samples)
         return np.array(n_sampless)
