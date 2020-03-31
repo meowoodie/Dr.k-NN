@@ -9,6 +9,7 @@ import utils
 import torch 
 import arrow
 import numpy as np
+from itertools import combinations 
 from torchvision import datasets, transforms
 
 class MiniMnist(torch.utils.data.Dataset):
@@ -40,6 +41,7 @@ class MiniMnist(torch.utils.data.Dataset):
         self.batch_size = batch_size
         self.n_sample   = n_sample
         self.N          = N
+        self.n_sampless = self._random_split_n_classes() # all possible combinations of  
 
         # data extraction and normalization
         self.data    = (self.dataset.data.float() - torch.min(self.dataset.data).float()) /\
@@ -78,14 +80,11 @@ class MiniMnist(torch.utils.data.Dataset):
             # fetch X and Y from each class iteratively
             n_remain_samples = self.n_sample
             _indices         = self.ids.copy()
+            n_samples_class  = self.n_sampless[np.random.randint(len(self.n_sampless))]
             for i, _class in enumerate(self.classes):
-                # determine numbers of samples selected from each class (>= 1)
-                n_samples_class_i = np.random.randint(n_remain_samples - 1) + 1 \
-                    if i != len(self.classes) - 1 else n_remain_samples
-                n_remain_samples -= n_samples_class_i
-                # randomly sample from remained indices in the list
+                # n_samples_class[i] is the number of samples selected from class i (>= 1)
                 np.random.shuffle(_indices[i])
-                indices_class_i   = _indices[i, :n_samples_class_i]
+                indices_class_i   = _indices[i, :n_samples_class[i]]
                 # fetch X and Y of class i according to their indices
                 x.append(self.data[indices_class_i])
                 y.append(self.targets[indices_class_i])
@@ -96,3 +95,16 @@ class MiniMnist(torch.utils.data.Dataset):
         X = torch.stack(X, dim=0)
         Y = torch.stack(Y, dim=0)
         return X, Y
+    
+    def _random_split_n_classes(self):
+        # list all possible combinations
+        combs = combinations(
+            range(1, self.n_sample - 1), # from n_sample - 1 possibilities 
+            len(self.classes) - 1)       # select n_class - 1 positions
+        # convert combinations to numbers of samples we need to split
+        n_sampless = []
+        for pos in combs:
+            pos = [0] + list(pos) + [self.n_sample - 1]
+            n_samples = [ pos[i+1] - pos[i] + 1 for i in range(len(self.classes)) ]
+            n_sampless.append(n_samples)
+        return np.array(n_sampless)

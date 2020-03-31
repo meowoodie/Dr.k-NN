@@ -62,12 +62,13 @@ def unittest_2():
     UNITTEST 2
     - func: utils.dataloader4mnistNclasses
     """
-    classes    = [1, 2]
+    classes    = [0, 1, 2, 3, 4, 5]
     batch_size = 5 
     n_sample   = 15
     dl         = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=20)
     for batch_idx, (x, y) in enumerate(dl):
-        break
+        print(y)
+        # break
 
 def unittest_1():
     """
@@ -103,7 +104,7 @@ def unittest_1():
 
 if __name__ == "__main__":
     # unittest_1()
-    # unittest_2()
+    unittest_2()
     # unittest_3()
-    unittest_4()
+    # unittest_4()
     pass
