@@ -49,27 +49,46 @@ def knn_regressor(H_test, H_train, p_hat_train, K=5):
     input
     - H_test:      [n_test_sample, n_feature]
     - H_train:     [n_train_sample, n_feature]
-    - p_hat_train: [n_train_sample, K]
+    - p_hat_train: [n_class, n_train_sample]
     output
-    - p_hat_test:  [n_test_sample, K]
+    - p_hat_test:  [n_class, n_test_sample]
     """
-    # calculate pairwise l2 distance between X and Y
-    def pairwise_dist(X, Y):
-        X_norm = (X**2).sum(dim=1).view(-1, 1)            # [n_xsample, 1]
-        Y_t    = torch.transpose(Y, 0, 1)                 # [n_feature, n_ysample]
-        Y_norm = (Y**2).sum(dim=1).view(1, -1)            # [1, n_ysample]
-        dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
-        return dist
-
     # find the indices of k-nearest neighbor in trainset
-    dist   = pairwise_dist(H_test, H_train)
+    dist   = utils.pairwise_dist(H_test, H_train)
     dist  *= -1
     _, knb = torch.topk(dist, K, dim=1)        # [n_test_sample, K]
-
     # calculate the class marginal probability (p_hat) for each test sample
     p_hat_test = torch.stack(
         [ p_hat_train[:, neighbors].mean(dim=1) 
             for neighbors in knb ], dim=0).t() # [n_class, n_test_sample]
+    return p_hat_test
+
+def kernel_smoother(H_test, H_train, p_hat_train, h=1e-2):
+    """
+    kernel smoothing test
+
+    Given the train embedding and its corresponding optimal marginal distribution for each class,
+    the function produce the prediction of p_hat for testing dataset given the test embedding based
+    on the kernel smoothing rule with the bandwidth h.
+
+    input
+    - H_test:      [n_test_sample, n_feature]
+    - H_train:     [n_train_sample, n_feature]
+    - p_hat_train: [n_class, n_train_sample]
+    output
+    - p_hat_test:  [n_class, n_test_sample]
+    """
+    n_test_sample, n_feature = H_test.shape[0], H_test.shape[1]
+    n_class, n_train_sample  = p_hat_train.shape[0], p_hat_train.shape[1]
+    # calculate the pairwise distance between training sample and testing sample
+    dist = utils.pairwise_dist(H_train, H_test)   # [n_train_sample, n_test_sample]
+    # apply gaussian kernel
+    G = 1 / (np.sqrt(2*np.pi*h) ** n_feature) * \
+        torch.exp(- dist ** 2 / (2 * h ** 2))     # [n_train_sample, n_test_sample]
+    G = G.unsqueeze(0).repeat([n_class, 1, 1])    # [n_class, n_train_sample, n_test_sample]
+    p_hat_ext  = p_hat_train.unsqueeze(2).\
+        repeat([1, 1, n_test_sample])             # [n_class, n_train_sample, n_test_sample]
+    p_hat_test = (G * p_hat_ext).mean(dim=1)      # [n_class, n_test_sample]
     return p_hat_test
 
 # GENERAL TRAIN PROCEDURE
@@ -131,17 +150,17 @@ def test(model, trainloader, testloader):
             H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
 
     # perform test
-    p_hat_test = knn_regressor(H_test, H_train, p_hat)
+    # p_hat_test = knn_regressor(H_test, H_train, p_hat)
+    p_hat_test = kernel_smoother(H_test, H_train, p_hat)
         
-    # calculate tv loss for test samples
-    test_loss  = tvloss(p_hat_test.unsqueeze(0))
     # calculate accuracy
     test_pred  = p_hat_test.argmax(dim=0)
     n_correct  = test_pred.eq(Y_test).sum().item()
     accuracy   = n_correct / len(testloader)
+    # # calculate tv loss for test samples
+    # test_loss  = tvloss(p_hat_test.unsqueeze(0))
         
-    print("[%s] Test set: Average loss: %.3f, Accuracy: %.3f (%d samples)" % \
-        (arrow.now(), test_loss, accuracy, len(testloader)))
+    print("[%s] Test set: Accuracy: %.3f (%d samples)" % (arrow.now(), accuracy, len(testloader)))
 
     utils.visualize_embedding(H_test, p_hat_test)
 

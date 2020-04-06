@@ -19,6 +19,16 @@ from sklearn.manifold import TSNE
 
 np.random.seed(1)
 
+def pairwise_dist(X, Y):
+    """
+    calculate pairwise l2 distance between X and Y
+    """
+    X_norm = (X**2).sum(dim=1).view(-1, 1)            # [n_xsample, 1]
+    Y_t    = torch.transpose(Y, 0, 1)                 # [n_feature, n_ysample]
+    Y_norm = (Y**2).sum(dim=1).view(1, -1)            # [1, n_ysample]
+    dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
+    return dist
+
 def visualize_embedding(H, p_hat, perplexity=20):
     """
     Visualize data embedding on a 2D space using TSNE. 
