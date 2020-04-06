@@ -11,8 +11,8 @@ from torch.optim.lr_scheduler import StepLR
 def main():
     """train function"""
     # model configurations
-    classes     = [0, 1, 2]
-    n_class     = 3
+    classes     = [0, 1]
+    n_class     = len(classes)
     n_sample    = 12
     n_feature   = 10
     max_theta   = 1e-2

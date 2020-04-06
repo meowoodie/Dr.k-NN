@@ -27,12 +27,52 @@ import numpy as np
 # import matplotlib.pyplot as plt
 from cvxpylayers.torch import CvxpyLayer
 
+# LOSS DEFINITION
+
 def tvloss(p_hat):
     """TV loss"""
     # p_max, _ = torch.max(p_hat, dim=1) # [batch_size, n_sample]
     # return p_max.sum(dim=1).mean()     # scalar
     p_min, _ = torch.min(p_hat, dim=1) # [batch_size, n_sample]
     return p_min.sum(dim=1).mean()     # scalar
+
+# TEST METHODS
+
+def knn_regressor(H_test, H_train, p_hat_train, K=5):
+    """
+    k-Nearest Neighbor Regressor
+
+    Given the train embedding and its corresponding optimal marginal distribution for each class,
+    the function produce the prediction of p_hat for testing dataset given the test embedding based
+    on the k-Nearest Neighbor rule.
+
+    input
+    - H_test:      [n_test_sample, n_feature]
+    - H_train:     [n_train_sample, n_feature]
+    - p_hat_train: [n_train_sample, K]
+    output
+    - p_hat_test:  [n_test_sample, K]
+    """
+    # calculate pairwise l2 distance between X and Y
+    def pairwise_dist(X, Y):
+        X_norm = (X**2).sum(dim=1).view(-1, 1)            # [n_xsample, 1]
+        Y_t    = torch.transpose(Y, 0, 1)                 # [n_feature, n_ysample]
+        Y_norm = (Y**2).sum(dim=1).view(1, -1)            # [1, n_ysample]
+        dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
+        return dist
+
+    # find the indices of k-nearest neighbor in trainset
+    dist   = pairwise_dist(H_test, H_train)
+    dist  *= -1
+    _, knb = torch.topk(dist, K, dim=1)        # [n_test_sample, K]
+
+    # calculate the class marginal probability (p_hat) for each test sample
+    p_hat_test = torch.stack(
+        [ p_hat_train[:, neighbors].mean(dim=1) 
+            for neighbors in knb ], dim=0).t() # [n_class, n_test_sample]
+    return p_hat_test
+
+# GENERAL TRAIN PROCEDURE
 
 def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interval=10):
     """training procedure for one epoch"""
@@ -50,12 +90,13 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                test(model, trainloader, testloader, K=5)
+                test(model, trainloader, testloader)
         if batch_idx > n_iter:
             break
         
+# GENERAL TEST PROCEDURE
 
-def test(model, trainloader, testloader, K):
+def test(model, trainloader, testloader):
     """
     calculate the pairwise distance between the data points from the test set and the train set, 
     respectively, and return the K-nearest neighbors from the train set for each data point in 
@@ -65,18 +106,7 @@ def test(model, trainloader, testloader, K):
     - model:       torch model
     - trainloader: the entire training data of the data loader 
     - testloader:  the entire testing data of the data loader
-    output
-    - k_neighbors: [n_test_sample, K]
-    - H_train:     [n_train_sample, n_feature]
     """
-    # calculate pairwise l2 distance between X and Y
-    def pairwise_dist(X, Y):
-        X_norm = (X**2).sum(dim=1).view(-1, 1)            # [n_xsample, 1]
-        Y_t    = torch.transpose(Y, 0, 1)                 # [n_feature, n_ysample]
-        Y_norm = (Y**2).sum(dim=1).view(1, -1)            # [1, n_ysample]
-        dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
-        return dist
-
     # given hidden embedding, evaluate corresponding p_hat using the output of the robust classifier layer
     def evaluate_p_hat(H, Q, theta):
         n_class, n_sample, n_feature = theta.shape[1], H.shape[1], H.shape[2]
@@ -99,16 +129,10 @@ def test(model, trainloader, testloader, K):
         theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
         p_hat   = evaluate_p_hat(
             H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
-        
-    # find the indices of k-nearest neighbor in trainset
-    dist   = pairwise_dist(H_test, H_train)
-    dist  *= -1
-    _, knb = torch.topk(dist, K, dim=1)                   # [n_test_sample, K]
 
-    # calculate the class marginal probability (p_hat) for each test sample
-    p_hat_test = torch.stack(
-        [ p_hat[:, neighbors].mean(dim=1) 
-            for neighbors in knb ], dim=0).t()            # [n_class, n_test_sample]
+    # perform test
+    p_hat_test = knn_regressor(H_test, H_train, p_hat)
+        
     # calculate tv loss for test samples
     test_loss  = tvloss(p_hat_test.unsqueeze(0))
     # calculate accuracy
@@ -121,7 +145,7 @@ def test(model, trainloader, testloader, K):
 
     utils.visualize_embedding(H_test, p_hat_test)
 
-
+# IMAGE CLASSIFIER
 
 class RobustImageClassifier(torch.nn.Module):
     """
@@ -193,7 +217,7 @@ class RobustImageClassifier(torch.nn.Module):
         p_hat = self.rbstclf(X, Q, theta)                       # [batch_size, n_class, n_sample]
         return p_hat
 
-
+# GENERAL CLASSIFIER
 
 class RobustClassifierLayer(torch.nn.Module):
     """
