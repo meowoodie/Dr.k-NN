@@ -32,6 +32,7 @@ class MiniMnist(torch.utils.data.Dataset):
         - classes:    selected classes in the dataset (from 0 to 9)
         - batch_size: number of sets of samples in one batch
         - n_sample:   number of samples in one set.
+        - N:          total number of samples for each class
         """
         # MNIST dataset
         self.dataset    = datasets.MNIST("data", train=is_train, download=True)
@@ -51,9 +52,11 @@ class MiniMnist(torch.utils.data.Dataset):
         # only keep classes specified in the argument `classes` from the dataset
         n        = self.targets.shape[0] # total number of samples
         self.ids = []                    # sets of indices, each set corresponds to a unique class
-        for _class in self.classes:
+        for i, _class in enumerate(self.classes):
             indices = [ idx for idx in range(n) if self.targets[idx] == _class ]
             assert len(indices) >= N, "data with class %d are less than N (%d)." % (_class, N)
+            # relabel data
+            self.targets[indices] = i
             np.random.shuffle(indices)
             self.ids.append(indices[:N])
         # ids contains the indices of selected samples for each class

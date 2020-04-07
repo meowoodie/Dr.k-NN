@@ -49,7 +49,7 @@ def evaluate_p_hat(H, Q, theta):
 
 # TEST METHODS
 
-def knn_regressor(H_test, H_train, p_hat_train, K=5):
+def knn_regressor(H_test, H_train, p_hat_train, K=2):
     """
     k-Nearest Neighbor Regressor
 
