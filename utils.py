@@ -38,12 +38,15 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
         cmap(np.linspace(minval, maxval, n)))
     return new_cmap
 
-def visualize_2Dspace(n_grid, max_H, min_H, H_train, Y_train, p_hat_test, prefix="test"):
+def visualize_2Dspace(
+    n_grid, max_H, min_H, p_hat_test, 
+    H_train, Y_train, H_test, Y_test, prefix="test"):
     """
     visualize 2D embedding space and corresponding training data points.
     """
     assert n_grid * n_grid == p_hat_test.shape[1]
     n_train_sample = H_train.shape[0]
+    n_test_sample  = H_test.shape[0]
     # organize the p_hat as a matrix
     p_hat_test = p_hat_test.numpy()
     p_hat_show = p_hat_test[0] / (p_hat_test[0] + p_hat_test[1])  # [n_grid * n_grid] NOTE: only for n_class = 2
@@ -53,6 +56,11 @@ def visualize_2Dspace(n_grid, max_H, min_H, H_train, Y_train, p_hat_test, prefix
     H_train    = (H_train - min_H) /\
         np.repeat(np.expand_dims(max_H - min_H, 0), n_train_sample, axis=0)
     H_train    = np.nan_to_num(H_train) * n_grid
+    # scale the testing data to (0, n_grid)
+    H_test     = H_test.numpy()
+    H_test     = (H_test - min_H) /\
+        np.repeat(np.expand_dims(max_H - min_H, 0), n_test_sample, axis=0)
+    H_test     = np.nan_to_num(H_test) * n_grid
     # prepare label set
     color_set  = ["b", "r"]
     Y_train    = Y_train.numpy()[0]
@@ -63,10 +71,13 @@ def visualize_2Dspace(n_grid, max_H, min_H, H_train, Y_train, p_hat_test, prefix
     cmap    = truncate_colormap(cm.get_cmap('RdBu'), 0.3, 0.7)
     implot  = ax.imshow(p_hat_mat, vmin=p_hat_mat.min(), vmax=p_hat_mat.max(), cmap=cmap)
     for c, y in zip(color_set, Y_set):
-        Y_inds = np.where(Y_train == y)[0]
-        plt.scatter(H_train[Y_inds, 1], H_train[Y_inds, 0], s=10, c=c)
+        Y_train_inds = np.where(Y_train == y)[0]
+        Y_test_inds  = np.where(Y_test == y)[0]
+        plt.scatter(H_train[Y_train_inds, 1], H_train[Y_train_inds, 0], s=15, c=c, linewidths="1", edgecolors="black")
+        plt.scatter(H_test[Y_test_inds, 1], H_test[Y_test_inds, 0], s=2, c=c, alpha=0.3)
     plt.axis('off')
     plt.savefig("results/%s_map_%s.pdf" % (prefix, arrow.now()), bbox_inches='tight')
+    plt.clf()
 
 def visualize_embedding(H, p_hat, useTSNE=True, perplexity=20):
     """
@@ -103,6 +114,7 @@ def visualize_embedding(H, p_hat, useTSNE=True, perplexity=20):
     for i in range(n_class):
         axs[i].scatter(E2D[:, 0], E2D[:, 1], c=p_hat[i, :], vmin=p_hat[i, :].min(), vmax=p_hat[i, :].max(), cmap=cms[i])
     plt.savefig("results/scatter_%s.pdf" % arrow.now())
+    plt.clf()
 
     # # plot 
     # fig, axs = plt.subplots(1, 2)

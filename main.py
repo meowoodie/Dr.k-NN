@@ -14,7 +14,7 @@ def main():
     classes     = [2, 6]
     n_class     = len(classes)
     n_feature   = 2
-    n_sample    = 4
+    n_sample    = 12
     max_theta   = 1e-2
     batch_size  = 10
     # training parameters
@@ -24,8 +24,8 @@ def main():
 
     # init model
     model       = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
-    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=5)
-    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=100)
+    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=15)
+    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=200)
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
     # training

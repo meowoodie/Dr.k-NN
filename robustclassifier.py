@@ -49,7 +49,7 @@ def evaluate_p_hat(H, Q, theta):
 
 # TEST METHODS
 
-def knn_regressor(H_test, H_train, p_hat_train, K=2):
+def knn_regressor(H_test, H_train, p_hat_train, K=5):
     """
     k-Nearest Neighbor Regressor
 
@@ -120,7 +120,7 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                search_through(model, trainloader)
+                search_through(model, trainloader, testloader)
                 # H_test, p_hat_test, _, _ = test(model, trainloader, testloader, test_method="knn")
                 # utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
         if batch_idx > n_iter:
@@ -159,7 +159,7 @@ def test(model, trainloader, testloader, test_method="knn"):
     print("[%s] Test set: Accuracy: %.3f (%d samples)" % (arrow.now(), accuracy, len(testloader)))
     return H_test, p_hat_test, H_train, p_hat
 
-def search_through(model, trainloader, n_grid=50):
+def search_through(model, trainloader, testloader, n_grid=50):
     """
     search through the embedding space, return the corresponding p_hat of a set of uniformly 
     sampled points in the space.
@@ -170,28 +170,36 @@ def search_through(model, trainloader, n_grid=50):
     # fetch data from trainset and testset
     X_train = trainloader.X.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
     Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
-    # get H (embeddings) and p_hat for trainset
+    X_test  = testloader.X.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
+    Y_test  = testloader.Y                                # [n_test_sample]
+    # get H (embeddings) and p_hat for trainset and testset
     model.eval()
     with torch.no_grad():
         Q       = utils.sortedY2Q(Y_train)                # [1, n_class, n_sample]
         H_train = model.data2vec(X_train)                 # [n_train_sample, n_feature]
+        H_test  = model.data2vec(X_test)                  # [n_test_sample, n_feature]
         theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
         p_hat   = evaluate_p_hat(
             H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
     # uniformly sample points in the embedding space
     # - the limits of the embedding space
-    min_H, max_H = H_train.min(dim=0)[0].numpy(), H_train.max(dim=0)[0].numpy()
+    min_H        = torch.cat((H_train, H_test), 0).min(dim=0)[0].numpy()
+    max_H        = torch.cat((H_train, H_test), 0).max(dim=0)[0].numpy()
     min_H, max_H = min_H - (max_H - min_H) * .2, max_H + (max_H - min_H) * .2
     H_space      = [ np.linspace(min_h, max_h, n_grid + 1)[:-1] 
         for min_h, max_h in zip(min_H, max_H) ]           # (n_feature [n_grid])
     H            = [ [x, y] for x in H_space[0] for y in H_space[1] ]
     H            = torch.Tensor(H)                        # [n_grid * n_grid, n_feature]
     # perform test
-    p_hat_knn    = knn_regressor(H, H_train, p_hat)     # [n_class, n_grid * n_grid]
-    p_hat_kernel = kernel_smoother(H, H_train, p_hat)   # [n_class, n_grid * n_grid]
+    p_hat_knn    = knn_regressor(H, H_train, p_hat)       # [n_class, n_grid * n_grid]
+    p_hat_kernel = kernel_smoother(H, H_train, p_hat)     # [n_class, n_grid * n_grid]
     # plot the space and the training point
-    utils.visualize_2Dspace(n_grid, max_H, min_H, H_train, Y_train, p_hat_knn, prefix="knn")
-    utils.visualize_2Dspace(n_grid, max_H, min_H, H_train, Y_train, p_hat_kernel, prefix="kernel")
+    utils.visualize_2Dspace(
+        n_grid, max_H, min_H, p_hat_knn, 
+        H_train, Y_train, H_test, Y_test, prefix="knn")
+    utils.visualize_2Dspace(
+        n_grid, max_H, min_H, p_hat_kernel, 
+        H_train, Y_train, H_test, Y_test, prefix="kernel")
     # return H, p_hat_test, H_train, p_hat 
 
 # IMAGE CLASSIFIER
