@@ -29,7 +29,7 @@ def pairwise_dist(X, Y):
     dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
     return dist
 
-def visualize_embedding(H, p_hat, perplexity=20):
+def visualize_embedding(H, p_hat, perplexity=20, useTSNE=True):
     """
     Visualize data embedding on a 2D space using TSNE. 
     
@@ -42,9 +42,14 @@ def visualize_embedding(H, p_hat, perplexity=20):
     n        = H.shape[0]
     H        = H.numpy()
     p_hat    = p_hat.numpy()
+    # check data dimension
+    assert useTSNE is True or H.shape[1] == 2
     # fit TSNE
-    tsne     = TSNE(n_components=2, init='random', random_state=0, perplexity=perplexity)
-    E2D      = tsne.fit_transform(H)
+    if useTSNE:
+        tsne = TSNE(n_components=2, init='random', random_state=0, perplexity=perplexity)
+        E2D  = tsne.fit_transform(H)
+    else:
+        E2D  = H
 
     # plot 
     fig, axs = plt.subplots(1, n_class)

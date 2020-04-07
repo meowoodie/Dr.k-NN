@@ -13,8 +13,8 @@ def main():
     # model configurations
     classes     = [0, 1]
     n_class     = len(classes)
+    n_feature   = 2
     n_sample    = 12
-    n_feature   = 10
     max_theta   = 1e-2
     batch_size  = 10
     # training parameters

@@ -109,13 +109,14 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                test(model, trainloader, testloader)
+                H_test, p_hat_test, _, _ = test(model, trainloader, testloader, test_method="knn")
+                utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
         if batch_idx > n_iter:
             break
         
 # GENERAL TEST PROCEDURE
 
-def test(model, trainloader, testloader):
+def test(model, trainloader, testloader, test_method="knn"):
     """
     calculate the pairwise distance between the data points from the test set and the train set, 
     respectively, and return the K-nearest neighbors from the train set for each data point in 
@@ -137,7 +138,6 @@ def test(model, trainloader, testloader):
     Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
     X_test  = testloader.X.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
     Y_test  = testloader.Y                                # [n_test_sample]
-
     # get H (embeddings) and p_hat for trainset and testset
     # and calculate p_hat
     model.eval()
@@ -148,21 +148,20 @@ def test(model, trainloader, testloader):
         theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
         p_hat   = evaluate_p_hat(
             H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
-
     # perform test
-    # p_hat_test = knn_regressor(H_test, H_train, p_hat)
-    p_hat_test = kernel_smoother(H_test, H_train, p_hat)
-        
+    assert test_method in ["knn", "kernel"]
+    if test_method == "knn":
+        p_hat_test = knn_regressor(H_test, H_train, p_hat)
+    elif test_method == "kernel":
+        p_hat_test = kernel_smoother(H_test, H_train, p_hat)   
     # calculate accuracy
-    test_pred  = p_hat_test.argmax(dim=0)
-    n_correct  = test_pred.eq(Y_test).sum().item()
-    accuracy   = n_correct / len(testloader)
+    test_pred = p_hat_test.argmax(dim=0)
+    n_correct = test_pred.eq(Y_test).sum().item()
+    accuracy  = n_correct / len(testloader)
     # # calculate tv loss for test samples
     # test_loss  = tvloss(p_hat_test.unsqueeze(0))
-        
     print("[%s] Test set: Accuracy: %.3f (%d samples)" % (arrow.now(), accuracy, len(testloader)))
-
-    utils.visualize_embedding(H_test, p_hat_test)
+    return H_test, p_hat_test, H_train, p_hat
 
 # IMAGE CLASSIFIER
 
