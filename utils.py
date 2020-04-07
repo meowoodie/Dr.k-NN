@@ -15,6 +15,8 @@ import torch
 import arrow
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
 from sklearn.manifold import TSNE
 
 np.random.seed(1)
@@ -29,9 +31,46 @@ def pairwise_dist(X, Y):
     dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
     return dist
 
-def visualize_embedding(H, p_hat, perplexity=20, useTSNE=True):
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    """truncate colormap by proportion"""
+    new_cmap = colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
+
+def visualize_2Dspace(n_grid, max_H, min_H, H_train, Y_train, p_hat_test, prefix="test"):
     """
-    Visualize data embedding on a 2D space using TSNE. 
+    visualize 2D embedding space and corresponding training data points.
+    """
+    assert n_grid * n_grid == p_hat_test.shape[1]
+    n_train_sample = H_train.shape[0]
+    # organize the p_hat as a matrix
+    p_hat_test = p_hat_test.numpy()
+    p_hat_show = p_hat_test[0] / (p_hat_test[0] + p_hat_test[1])  # [n_grid * n_grid] NOTE: only for n_class = 2
+    p_hat_mat  = p_hat_show.reshape(n_grid, n_grid)               # [n_class, n_grid, n_grid]
+    # scale the training data to (0, n_grid)
+    H_train    = H_train.numpy()
+    H_train    = (H_train - min_H) /\
+        np.repeat(np.expand_dims(max_H - min_H, 0), n_train_sample, axis=0)
+    H_train    = np.nan_to_num(H_train) * n_grid
+    # prepare label set
+    color_set  = ["b", "r"]
+    Y_train    = Y_train.numpy()[0]
+    Y_set      = list(set(Y_train))
+    Y_set.sort()
+    # plot the region
+    fig, ax = plt.subplots(1, 1)
+    cmap    = truncate_colormap(cm.get_cmap('RdBu'), 0.3, 0.7)
+    implot  = ax.imshow(p_hat_mat, vmin=p_hat_mat.min(), vmax=p_hat_mat.max(), cmap=cmap)
+    for c, y in zip(color_set, Y_set):
+        Y_inds = np.where(Y_train == y)[0]
+        plt.scatter(H_train[Y_inds, 1], H_train[Y_inds, 0], s=10, c=c)
+    plt.axis('off')
+    plt.savefig("results/%s_map_%s.pdf" % (prefix, arrow.now()), bbox_inches='tight')
+
+def visualize_embedding(H, p_hat, useTSNE=True, perplexity=20):
+    """
+    visualize data embedding on a 2D space using TSNE. 
     
     input
     - H:     [n_sample, n_feature]
