@@ -73,7 +73,7 @@ def visualize_2Dspace(
     for c, y in zip(color_set, Y_set):
         Y_train_inds = np.where(Y_train == y)[0]
         Y_test_inds  = np.where(Y_test == y)[0]
-        plt.scatter(H_train[Y_train_inds, 1], H_train[Y_train_inds, 0], s=15, c=c, linewidths="1", edgecolors="black")
+        plt.scatter(H_train[Y_train_inds, 1], H_train[Y_train_inds, 0], s=20, c=c, linewidths="1", edgecolors="black")
         plt.scatter(H_test[Y_test_inds, 1], H_test[Y_test_inds, 0], s=2, c=c, alpha=0.3)
     plt.axis('off')
     plt.savefig("results/%s_map_%s.pdf" % (prefix, arrow.now()), bbox_inches='tight')

@@ -8,13 +8,15 @@ import robustclassifier as rc
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 
+
+
 def main():
     """train function"""
     # model configurations
     classes     = [4, 6]
     n_class     = len(classes)
     n_feature   = 2
-    n_sample    = 12
+    n_sample    = 4 # 12
     max_theta   = 1e-2
     batch_size  = 10
     # training parameters
@@ -24,8 +26,8 @@ def main():
 
     # init model
     model       = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
-    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=15)
-    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=200)
+    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=5)
+    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=500)
     trainloader.save_figures()
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
@@ -33,7 +35,7 @@ def main():
     optimizer   = optim.Adadelta(model.parameters(), lr=lr)
     scheduler   = StepLR(optimizer, step_size=1, gamma=gamma)
     rc.train(model, optimizer, trainloader, testloader, n_iter=100, log_interval=5)
-    rc.search_through(model, trainloader, testloader, K=6, h=1e-1)
+    rc.search_through(model, trainloader, testloader, K=5, h=1e-1)
 
     # save model
     torch.save(model.state_dict(), "saved_model/mnist_cnn.pt")
