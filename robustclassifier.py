@@ -74,7 +74,7 @@ def knn_regressor(H_test, H_train, p_hat_train, K=5):
             for neighbors in knb ], dim=0).t() # [n_class, n_test_sample]
     return p_hat_test
 
-def kernel_smoother(H_test, H_train, p_hat_train, h=1e-2):
+def kernel_smoother(H_test, H_train, p_hat_train, h=1e-1):
     """
     kernel smoothing test
 
@@ -94,7 +94,7 @@ def kernel_smoother(H_test, H_train, p_hat_train, h=1e-2):
     # calculate the pairwise distance between training sample and testing sample
     dist = utils.pairwise_dist(H_train, H_test)   # [n_train_sample, n_test_sample]
     # apply gaussian kernel
-    G = 1 / (np.sqrt(2*np.pi*h) ** n_feature) * \
+    G = 1 / ((np.sqrt(2*np.pi) * h) ** n_feature) * \
         torch.exp(- dist ** 2 / (2 * h ** 2))     # [n_train_sample, n_test_sample]
     G = G.unsqueeze(0).repeat([n_class, 1, 1])    # [n_class, n_train_sample, n_test_sample]
     p_hat_ext  = p_hat_train.unsqueeze(2).\
@@ -120,8 +120,7 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                search_through(model, trainloader, testloader)
-                # H_test, p_hat_test, _, _ = test(model, trainloader, testloader, test_method="knn")
+                H_test, p_hat_test, _, _ = test(model, trainloader, testloader, test_method="knn")
                 # utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
         if batch_idx > n_iter:
             break
@@ -159,7 +158,7 @@ def test(model, trainloader, testloader, test_method="knn"):
     print("[%s] Test set: Accuracy: %.3f (%d samples)" % (arrow.now(), accuracy, len(testloader)))
     return H_test, p_hat_test, H_train, p_hat
 
-def search_through(model, trainloader, testloader, n_grid=50):
+def search_through(model, trainloader, testloader, n_grid=50, K=5, h=1e-1):
     """
     search through the embedding space, return the corresponding p_hat of a set of uniformly 
     sampled points in the space.
@@ -191,16 +190,15 @@ def search_through(model, trainloader, testloader, n_grid=50):
     H            = [ [x, y] for x in H_space[0] for y in H_space[1] ]
     H            = torch.Tensor(H)                        # [n_grid * n_grid, n_feature]
     # perform test
-    p_hat_knn    = knn_regressor(H, H_train, p_hat)       # [n_class, n_grid * n_grid]
-    p_hat_kernel = kernel_smoother(H, H_train, p_hat)     # [n_class, n_grid * n_grid]
+    p_hat_knn    = knn_regressor(H, H_train, p_hat, K)    # [n_class, n_grid * n_grid]
+    p_hat_kernel = kernel_smoother(H, H_train, p_hat, h)  # [n_class, n_grid * n_grid]
     # plot the space and the training point
     utils.visualize_2Dspace(
         n_grid, max_H, min_H, p_hat_knn, 
-        H_train, Y_train, H_test, Y_test, prefix="knn")
+        H_train, Y_train, H_test, Y_test, prefix="knn_k%d" % K)
     utils.visualize_2Dspace(
         n_grid, max_H, min_H, p_hat_kernel, 
-        H_train, Y_train, H_test, Y_test, prefix="kernel")
-    # return H, p_hat_test, H_train, p_hat 
+        H_train, Y_train, H_test, Y_test, prefix="kernel_h%f" % h)
 
 # IMAGE CLASSIFIER
 

@@ -9,8 +9,12 @@ import utils
 import torch 
 import arrow
 import numpy as np
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 from itertools import combinations 
 from torchvision import datasets, transforms
+
+np.random.seed(1)
 
 class MiniMnist(torch.utils.data.Dataset):
     """
@@ -111,3 +115,14 @@ class MiniMnist(torch.utils.data.Dataset):
             n_samples = [ pos[i+1] - pos[i] for i in range(len(self.classes)) ]
             n_sampless.append(n_samples)
         return np.array(n_sampless)
+    
+    def save_figures(self):
+        cmap = cm.get_cmap('Greys')
+        for i in np.array(self.ids).flatten():
+            fig, ax = plt.subplots(1, 1)
+            implot  = ax.imshow(self.data[i], vmin=self.X.min(), vmax=self.X.max(), cmap=cmap)
+            plt.axis('off')
+            plt.savefig(
+                "dataimgs/img_num%d_id%d.pdf" % (self.classes[self.targets[i]], i), 
+                bbox_inches='tight')
+            plt.clf()
