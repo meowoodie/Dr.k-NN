@@ -12,14 +12,6 @@ Dependencies:
 """
 
 import torch 
-import arrow
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as colors
-from sklearn.manifold import TSNE
-
-np.random.seed(1)
 
 def pairwise_dist(X, Y):
     """
@@ -29,105 +21,7 @@ def pairwise_dist(X, Y):
     Y_t    = torch.transpose(Y, 0, 1)                 # [n_feature, n_ysample]
     Y_norm = (Y**2).sum(dim=1).view(1, -1)            # [1, n_ysample]
     dist   = X_norm + Y_norm - 2.0 * torch.mm(X, Y_t) # [n_xsample, n_ysample]
-    return dist
-
-def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
-    """truncate colormap by proportion"""
-    new_cmap = colors.LinearSegmentedColormap.from_list(
-        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
-        cmap(np.linspace(minval, maxval, n)))
-    return new_cmap
-
-def visualize_2Dspace(
-    n_grid, max_H, min_H, p_hat_test, 
-    H_train, Y_train, H_test, Y_test, prefix="test"):
-    """
-    visualize 2D embedding space and corresponding training data points.
-    """
-    assert n_grid * n_grid == p_hat_test.shape[1]
-    n_train_sample = H_train.shape[0]
-    n_test_sample  = H_test.shape[0]
-    # organize the p_hat as a matrix
-    p_hat_test = p_hat_test.numpy()
-    p_hat_show = p_hat_test[0] / (p_hat_test[0] + p_hat_test[1])  # [n_grid * n_grid] NOTE: only for n_class = 2
-    p_hat_mat  = p_hat_show.reshape(n_grid, n_grid)               # [n_class, n_grid, n_grid]
-    # scale the training data to (0, n_grid)
-    H_train    = H_train.numpy()
-    H_train    = (H_train - min_H) /\
-        np.repeat(np.expand_dims(max_H - min_H, 0), n_train_sample, axis=0)
-    H_train    = np.nan_to_num(H_train) * n_grid
-    # scale the testing data to (0, n_grid)
-    H_test     = H_test.numpy()
-    H_test     = (H_test - min_H) /\
-        np.repeat(np.expand_dims(max_H - min_H, 0), n_test_sample, axis=0)
-    H_test     = np.nan_to_num(H_test) * n_grid
-    # prepare label set
-    color_set  = ["b", "r"]
-    Y_train    = Y_train.numpy()[0]
-    Y_set      = list(set(Y_train))
-    Y_set.sort()
-    # plot the region
-    fig, ax = plt.subplots(1, 1)
-    cmap    = truncate_colormap(cm.get_cmap('RdBu'), 0.3, 0.7)
-    implot  = ax.imshow(p_hat_mat, vmin=p_hat_mat.min(), vmax=p_hat_mat.max(), cmap=cmap)
-    for c, y in zip(color_set, Y_set):
-        Y_train_inds = np.where(Y_train == y)[0]
-        Y_test_inds  = np.where(Y_test == y)[0]
-        plt.scatter(H_train[Y_train_inds, 1], H_train[Y_train_inds, 0], s=20, c=c, linewidths="1", edgecolors="black")
-        plt.scatter(H_test[Y_test_inds, 1], H_test[Y_test_inds, 0], s=2, c=c, alpha=0.3)
-    plt.axis('off')
-    plt.savefig("results/%s_map_%s.pdf" % (prefix, arrow.now()), bbox_inches='tight')
-    plt.clf()
-
-def visualize_embedding(H, p_hat, useTSNE=True, perplexity=20):
-    """
-    visualize data embedding on a 2D space using TSNE. 
-    
-    input
-    - H:     [n_sample, n_feature]
-    - p_hat: [n_class, n_sample]
-    """
-    # configuration
-    n_class  = p_hat.shape[0] 
-    n        = H.shape[0]
-    H        = H.numpy()
-    p_hat    = p_hat.numpy()
-    # check data dimension
-    assert useTSNE is True or H.shape[1] == 2
-    # fit TSNE
-    if useTSNE:
-        tsne = TSNE(n_components=2, init='random', random_state=0, perplexity=perplexity)
-        E2D  = tsne.fit_transform(H)
-    else:
-        E2D  = H
-
-    # plot 
-    fig, axs = plt.subplots(1, n_class)
-    # ax 
-    # ax1      = axs[0]
-    # ax2      = axs[1]
-    # plot embedding colored by their labels
-    # cm1 = plt.cm.get_cmap('Reds')
-    # cm2 = plt.cm.get_cmap('Blues')
-    cms = [ plt.cm.get_cmap(c) for c in ['Reds', 'Blues', 'Greens'] ]
-
-    for i in range(n_class):
-        axs[i].scatter(E2D[:, 0], E2D[:, 1], c=p_hat[i, :], vmin=p_hat[i, :].min(), vmax=p_hat[i, :].max(), cmap=cms[i])
-    plt.savefig("results/scatter_%s.pdf" % arrow.now())
-    plt.clf()
-
-    # # plot 
-    # fig, axs = plt.subplots(1, 2)
-    # cm       = plt.cm.get_cmap('RdYlBu')
-    # ax1      = axs[0]
-    # ax2      = axs[1]
-    # # plot embedding colored by their labels
-    # ax1.scatter(E2D[:int(n/2), 0], E2D[:int(n/2), 1], c="b")
-    # ax1.scatter(E2D[int(n/2):, 0], E2D[int(n/2):, 1], c="r")
-    # # plot embedding colored by p_hat
-    # p_hat = p_hat[0] / (p_hat[0] + p_hat[1])
-    # ax2.scatter(E2D[:, 0], E2D[:, 1], c=p_hat, vmin=0, vmax=1, cmap=cm)
-    # plt.savefig("results/scatter_%s.pdf" % arrow.now())  
+    return dist 
 
 def sortedY2Q(Y):
     """
@@ -176,3 +70,32 @@ def sortedY2Q(Y):
 #     _Y = torch.stack(_Y, dim=0)
 #     _X = torch.stack(_X, dim=0)
 #     return _X, _Y
+
+# def plot_acc_over_k():
+#     with open("resultsacc/knn.txt", "r") as f:
+#         data = [ [ float(d) for d in line.strip("\n").split(",") ] for line in f.readlines() ]
+
+#     t = np.arange(len(data[0]))
+
+#     # the steps and position
+#     X = np.array(data).mean(0)
+
+#     # the 1 sigma upper and lower analytic population bounds
+#     lower_bound = np.array(data).min(0)
+#     upper_bound = np.array(data).max(0)
+
+#     fig, ax = plt.subplots(1)
+#     ax.plot(t, X, lw=2, label='mean accuracy', color='blue')
+#     # ax.plot(t, mu*t, lw=1, label='population mean', color='black', ls='--')
+#     ax.fill_between(t, lower_bound, upper_bound, facecolor='yellow', alpha=0.5,
+#                     label='3 sigma range')
+#     ax.legend(loc='upper left')
+
+#     # here we use the where argument to only fill the region where the
+#     # walker is above the population 1 sigma boundary
+#     # ax.fill_between(t, upper_bound, X, where=X > upper_bound, facecolor='blue',
+#     #                 alpha=0.5)
+#     ax.set_xlabel('k')
+#     ax.set_ylabel('accuracy')
+#     ax.grid()
+#     plt.show()

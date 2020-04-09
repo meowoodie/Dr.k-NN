@@ -22,6 +22,7 @@ import nn
 import arrow
 import utils
 import torch 
+import plots
 import cvxpy as cp
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -156,7 +157,7 @@ def test(model, trainloader, testloader, K=5, h=1e-1):
     print("[%s] Test set: kNN accuracy: %.3f, kernel smoothing accuracy: %.3f (%d samples)" % (arrow.now(), knn_accuracy, kernel_accuracy, len(testloader)))
     return knn_accuracy, kernel_accuracy
 
-def search_through(model, trainloader, testloader, n_grid=50, K=5, h=1e-1):
+def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     """
     search through the embedding space, return the corresponding p_hat of a set of uniformly 
     sampled points in the space.
@@ -191,10 +192,10 @@ def search_through(model, trainloader, testloader, n_grid=50, K=5, h=1e-1):
     p_hat_knn    = knn_regressor(H, H_train, p_hat, K)    # [n_class, n_grid * n_grid]
     p_hat_kernel = kernel_smoother(H, H_train, p_hat, h)  # [n_class, n_grid * n_grid]
     # plot the space and the training point
-    utils.visualize_2Dspace(
+    plots.visualize_2Dspace(
         n_grid, max_H, min_H, p_hat_knn, 
         H_train, Y_train, H_test, Y_test, prefix="knn_k%d" % K)
-    utils.visualize_2Dspace(
+    plots.visualize_2Dspace(
         n_grid, max_H, min_H, p_hat_kernel, 
         H_train, Y_train, H_test, Y_test, prefix="kernel_h%f" % h)
 
