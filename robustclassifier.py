@@ -120,14 +120,14 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                H_test, p_hat_test, _, _ = test(model, trainloader, testloader, test_method="knn")
-                # utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
+                test(model, trainloader, testloader, K=5, h=1e-1)
+            #     utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
         if batch_idx > n_iter:
             break
         
 # GENERAL TEST PROCEDURE
 
-def test(model, trainloader, testloader, test_method="knn"):
+def test(model, trainloader, testloader, K=5, h=1e-1):
     """testing procedure"""
     # fetch data from trainset and testset
     X_train = trainloader.X.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
@@ -144,19 +144,17 @@ def test(model, trainloader, testloader, test_method="knn"):
         p_hat   = evaluate_p_hat(
             H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
     # perform test
-    assert test_method in ["knn", "kernel"]
-    if test_method == "knn":
-        p_hat_test = knn_regressor(H_test, H_train, p_hat)
-    elif test_method == "kernel":
-        p_hat_test = kernel_smoother(H_test, H_train, p_hat)   
+    p_hat_knn    = knn_regressor(H_test, H_train, p_hat, K)
+    p_hat_kernel = kernel_smoother(H_test, H_train, p_hat, h)   
     # calculate accuracy
-    test_pred = p_hat_test.argmax(dim=0)
-    n_correct = test_pred.eq(Y_test).sum().item()
-    accuracy  = n_correct / len(testloader)
-    # # calculate tv loss for test samples
-    # test_loss  = tvloss(p_hat_test.unsqueeze(0))
-    print("[%s] Test set: Accuracy: %.3f (%d samples)" % (arrow.now(), accuracy, len(testloader)))
-    return H_test, p_hat_test, H_train, p_hat
+    knn_pred         = p_hat_knn.argmax(dim=0)
+    knn_n_correct    = knn_pred.eq(Y_test).sum().item()
+    knn_accuracy     = knn_n_correct / len(testloader)
+    kernel_pred      = p_hat_kernel.argmax(dim=0)
+    kernel_n_correct = kernel_pred.eq(Y_test).sum().item()
+    kernel_accuracy  = kernel_n_correct / len(testloader)
+    print("[%s] Test set: kNN accuracy: %.3f, kernel smoothing accuracy: %.3f (%d samples)" % (arrow.now(), knn_accuracy, kernel_accuracy, len(testloader)))
+    return knn_accuracy, kernel_accuracy
 
 def search_through(model, trainloader, testloader, n_grid=50, K=5, h=1e-1):
     """
