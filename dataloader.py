@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from itertools import combinations 
-from torchvision import datasets, transforms
+from torchvision import datasets
 
 np.random.seed(1)
 
@@ -20,8 +20,10 @@ class MiniMnist(torch.utils.data.Dataset):
     """
     Dataloader for a mini MNIST
 
-    This data loader only utilizes a very small portion of data in MNIST, which contains `N` images for each category (`2 * N` in total). Every iteration, the data loader would yield a batch of sample sets, where 
-    each sample set contains `n_sample` samples and each class in this set at least has one sample. 
+    This data loader only utilizes a very small portion of data in MNIST, which contains `N` images 
+    for each category (`2 * N` in total). Every iteration, the data loader would yield a batch of 
+    sample sets, where each sample set contains `n_sample` samples and each class in this set at least 
+    has one sample. 
 
     You may be able to access:
     - self.data and self.targets for the whole dataset in MNIST
@@ -126,3 +128,10 @@ class MiniMnist(torch.utils.data.Dataset):
                 "dataimgs/img_num%d_id%d.pdf" % (self.classes[self.targets[i]], i), 
                 bbox_inches='tight')
             plt.clf()
+
+
+
+# class MiniImageNet(torch.utils.data.Dataset):
+
+if __name__ == "__main__":
+    pass

@@ -119,9 +119,9 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
         optimizer.step()         # update optimizer
         if batch_idx % log_interval == 0:
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
-            # TODO: temporarily place test right here, will remove it in the end.
-            if testloader is not None:
-                test(model, trainloader, testloader, K=5, h=1e-1)
+            # # TODO: temporarily place test right here, will remove it in the end.
+            # if testloader is not None:
+            #     test(model, trainloader, testloader, K=5, h=1e-1)
             #     utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
         if batch_idx > n_iter:
             break
@@ -183,7 +183,7 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     # - the limits of the embedding space
     min_H        = torch.cat((H_train, H_test), 0).min(dim=0)[0].numpy()
     max_H        = torch.cat((H_train, H_test), 0).max(dim=0)[0].numpy()
-    min_H, max_H = min_H - (max_H - min_H) * .2, max_H + (max_H - min_H) * .2
+    min_H, max_H = min_H - (max_H - min_H) * .1, max_H + (max_H - min_H) * .1
     H_space      = [ np.linspace(min_h, max_h, n_grid + 1)[:-1] 
         for min_h, max_h in zip(min_H, max_H) ]           # (n_feature [n_grid])
     H            = [ [x, y] for x in H_space[0] for y in H_space[1] ]
@@ -191,13 +191,43 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     # perform test
     p_hat_knn    = knn_regressor(H, H_train, p_hat, K)    # [n_class, n_grid * n_grid]
     p_hat_kernel = kernel_smoother(H, H_train, p_hat, h)  # [n_class, n_grid * n_grid]
-    # plot the space and the training point
-    plots.visualize_2Dspace(
-        n_grid, max_H, min_H, p_hat_knn, 
-        H_train, Y_train, H_test, Y_test, prefix="knn_k%d" % K)
-    plots.visualize_2Dspace(
-        n_grid, max_H, min_H, p_hat_kernel, 
-        H_train, Y_train, H_test, Y_test, prefix="kernel_h%f" % h)
+    # # perform boundary knn test
+    # _p_hat         = p_hat[0] / (p_hat[0] + p_hat[1])
+    # print(_p_hat)
+    # _indices       = ((_p_hat > 0.05) * (_p_hat < 0.95)).nonzero().flatten()
+    # print(_indices)
+    # bdry_p_hat     = p_hat[:, _indices]
+    # bdry_H_train   = H_train[_indices]
+    # bdry_Y_train   = Y_train[:, _indices]
+    # print(bdry_p_hat.shape, bdry_H_train.shape)
+    # bdry_p_hat_knn = knn_regressor(H, bdry_H_train, bdry_p_hat, 2)  # [n_class, n_grid * n_grid]
+
+    plot the space and the training point
+    plots.visualize_2Dspace_LFD(
+        n_grid, max_H, min_H, p_hat_kernel, 0,
+        H_train, Y_train, H_test, Y_test, prefix="class0")
+    plots.visualize_2Dspace_LFD(
+        n_grid, max_H, min_H, p_hat_kernel, 1,
+        H_train, Y_train, H_test, Y_test, prefix="class1")
+    plots.visualize_2Dspace_LFD(
+        n_grid, max_H, min_H, p_hat_kernel, 2,
+        H_train, Y_train, H_test, Y_test, prefix="class2")
+    plots.visualize_2Dspace_Nclass(
+        n_grid, max_H, min_H, p_hat_knn,
+        H_train, Y_train, H_test, Y_test, prefix="knn")
+
+    # plots.visualize_2Dspace_2class_boundary(
+    #     n_grid, max_H, min_H, p_hat_knn,
+    #     H_train, Y_train, H_test, Y_test, prefix="kernel_boundary")
+    # plots.visualize_2Dspace_2class_boundary(
+    #     n_grid, max_H, min_H, p_hat_kernel,
+    #     H_train, Y_train, H_test, Y_test, prefix="knn_boundary")
+    # plots.visualize_2Dspace_Nclass(
+    #     n_grid, max_H, min_H, p_hat_knn,
+    #     H_train, Y_train, H_test, Y_test, prefix="knn")
+    # plots.visualize_2Dspace_Nclass(
+    #     n_grid, max_H, min_H, bdry_p_hat_knn,
+    #     bdry_H_train, bdry_Y_train, H_test, Y_test, prefix="knn_boundary_select")
 
 # IMAGE CLASSIFIER
 

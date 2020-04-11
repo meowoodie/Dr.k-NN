@@ -13,10 +13,10 @@ from torch.optim.lr_scheduler import StepLR
 def main():
     """train function"""
     # model configurations
-    classes     = [4, 6]
+    classes     = [0, 1]
     n_class     = len(classes)
     n_feature   = 2
-    n_sample    = 4 # 12
+    n_sample    = 9 # 12
     max_theta   = 1e-2
     batch_size  = 10
     # training parameters
@@ -26,19 +26,33 @@ def main():
 
     # init model
     model       = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
-    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=5)
-    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=500)
+    trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=10)
+    testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=200)
     trainloader.save_figures()
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
     # training
     optimizer   = optim.Adadelta(model.parameters(), lr=lr)
     scheduler   = StepLR(optimizer, step_size=1, gamma=gamma)
-    rc.train(model, optimizer, trainloader, testloader, n_iter=100, log_interval=5)
-    rc.search_through(model, trainloader, testloader, K=5, h=1e-1)
+    rc.train(model, optimizer, trainloader, testloader, n_iter=150, log_interval=5)
+    rc.search_through(model, trainloader, testloader, K=5, h=8e-3)
+    
+    # test
+    # Ks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # hs = [1e+5, 1e+4, 1e+3, 1e+2, 1e+1, 1e+0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+    # knn_res    = []
+    # kernel_res = []
+    # for K, h in zip(Ks, hs):
+    #     print("testing K=%d and h=%f" % (K, h))
+    #     knn_acc, kernel_acc = rc.test(model, trainloader, testloader, K=K, h=h)
+    #     knn_res.append(str(knn_acc))
+    #     kernel_res.append(str(kernel_acc))
+    
+    # print("knn", ",".join(knn_res))
+    # print("kernel", ",".join(kernel_res))
 
-    # save model
-    torch.save(model.state_dict(), "saved_model/mnist_cnn.pt")
+    # # save model
+    # torch.save(model.state_dict(), "saved_model/mnist_cnn.pt")
 
     # # trainable parameters
     # for name, param in model.named_parameters():
