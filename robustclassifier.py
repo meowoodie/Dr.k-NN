@@ -191,6 +191,11 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     # perform test
     p_hat_knn    = knn_regressor(H, H_train, p_hat, K)    # [n_class, n_grid * n_grid]
     p_hat_kernel = kernel_smoother(H, H_train, p_hat, h)  # [n_class, n_grid * n_grid]
+
+    plots.visualize_2Dspace_2class(
+        n_grid, max_H, min_H, p_hat_knn,
+        H_train, Y_train, H_test, Y_test, prefix="test")
+
     # # perform boundary knn test
     # _p_hat         = p_hat[0] / (p_hat[0] + p_hat[1])
     # print(_p_hat)
@@ -202,19 +207,19 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     # print(bdry_p_hat.shape, bdry_H_train.shape)
     # bdry_p_hat_knn = knn_regressor(H, bdry_H_train, bdry_p_hat, 2)  # [n_class, n_grid * n_grid]
 
-    plot the space and the training point
-    plots.visualize_2Dspace_LFD(
-        n_grid, max_H, min_H, p_hat_kernel, 0,
-        H_train, Y_train, H_test, Y_test, prefix="class0")
-    plots.visualize_2Dspace_LFD(
-        n_grid, max_H, min_H, p_hat_kernel, 1,
-        H_train, Y_train, H_test, Y_test, prefix="class1")
-    plots.visualize_2Dspace_LFD(
-        n_grid, max_H, min_H, p_hat_kernel, 2,
-        H_train, Y_train, H_test, Y_test, prefix="class2")
-    plots.visualize_2Dspace_Nclass(
-        n_grid, max_H, min_H, p_hat_knn,
-        H_train, Y_train, H_test, Y_test, prefix="knn")
+    # # plot the space and the training point
+    # plots.visualize_2Dspace_LFD(
+    #     n_grid, max_H, min_H, p_hat_kernel, 0,
+    #     H_train, Y_train, H_test, Y_test, prefix="class0")
+    # plots.visualize_2Dspace_LFD(
+    #     n_grid, max_H, min_H, p_hat_kernel, 1,
+    #     H_train, Y_train, H_test, Y_test, prefix="class1")
+    # plots.visualize_2Dspace_LFD(
+    #     n_grid, max_H, min_H, p_hat_kernel, 2,
+    #     H_train, Y_train, H_test, Y_test, prefix="class2")
+    # plots.visualize_2Dspace_Nclass(
+    #     n_grid, max_H, min_H, p_hat_knn,
+    #     H_train, Y_train, H_test, Y_test, prefix="knn")
 
     # plots.visualize_2Dspace_2class_boundary(
     #     n_grid, max_H, min_H, p_hat_knn,
@@ -264,7 +269,7 @@ class RobustImageClassifier(torch.nn.Module):
         self.max_theta = max_theta
         self.n_feature = n_feature
         # Image to Vec layer
-        self.data2vec  = nn.Image2Vec(n_feature, 
+        self.data2vec  = nn.SimpleImage2Vec(n_feature, 
             n_pixel, in_channel, out_channel, kernel_size, stride, keepprob)
         # robust classifier layer
         # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
@@ -292,14 +297,14 @@ class RobustImageClassifier(torch.nn.Module):
         # NOTE: merge the batch_size dimension and n_sample dimension
         X = X.view(batch_size*n_sample, 
             X.shape[2], X.shape[3], X.shape[4])       # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
-        X = self.data2vec(X)                          # [batch_size*n_sample, n_feature]
+        Z = self.data2vec(X)                          # [batch_size*n_sample, n_feature]
                                                       # NOTE: reshape back to batch_size and n_sample
-        X = X.view(batch_size, n_sample, X.shape[-1]) # [batch_size, n_sample, n_feature]
+        Z = Z.view(batch_size, n_sample, Z.shape[-1]) # [batch_size, n_sample, n_feature]
 
         # robust classifier layer
         # theta = torch.ones(batch_size, self.n_class, requires_grad=True) * self.max_theta
         theta = self.theta.unsqueeze(0).repeat([batch_size, 1]) # [batch_size, n_class]
-        p_hat = self.rbstclf(X, Q, theta)                       # [batch_size, n_class, n_sample]
+        p_hat = self.rbstclf(Z, Q, theta)                       # [batch_size, n_class, n_sample]
         return p_hat
 
 # GENERAL CLASSIFIER
