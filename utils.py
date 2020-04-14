@@ -13,6 +13,13 @@ Dependencies:
 
 import torch 
 
+def tvloss(p_hat):
+    """TV loss"""
+    # p_max, _ = torch.max(p_hat, dim=1) # [batch_size, n_sample]
+    # return p_max.sum(dim=1).mean()     # scalar
+    p_min, _ = torch.min(p_hat, dim=1) # [batch_size, n_sample]
+    return p_min.sum(dim=1).mean()     # scalar
+
 def pairwise_dist(X, Y):
     """
     calculate pairwise l2 distance between X and Y

@@ -28,14 +28,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 from cvxpylayers.torch import CvxpyLayer
 
-# LOSS DEFINITION
 
-def tvloss(p_hat):
-    """TV loss"""
-    # p_max, _ = torch.max(p_hat, dim=1) # [batch_size, n_sample]
-    # return p_max.sum(dim=1).mean()     # scalar
-    p_min, _ = torch.min(p_hat, dim=1) # [batch_size, n_sample]
-    return p_min.sum(dim=1).mean()     # scalar
 
 # HELPER FUNCTIONS
 
@@ -111,12 +104,12 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
     #       since it is not leaf node. (it's root node)
     for batch_idx, (X, Y) in enumerate(trainloader):
         model.train()
-        Q = utils.sortedY2Q(Y)   # calculate empirical distribution based on labels
-        optimizer.zero_grad()    # init optimizer (set gradient to be zero)
-        p_hat = model(X, Q)      # inference
-        loss  = tvloss(p_hat)    # calculate tv loss
-        loss.backward()          # gradient descent
-        optimizer.step()         # update optimizer
+        Q = utils.sortedY2Q(Y)      # calculate empirical distribution based on labels
+        optimizer.zero_grad()       # init optimizer (set gradient to be zero)
+        p_hat = model(X, Q)         # inference
+        loss  = utils.tvloss(p_hat) # calculate tv loss
+        loss.backward()             # gradient descent
+        optimizer.step()            # update optimizer
         if batch_idx % log_interval == 0:
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # # TODO: temporarily place test right here, will remove it in the end.
