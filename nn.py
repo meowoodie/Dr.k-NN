@@ -22,7 +22,7 @@ class SimpleImage2Vec(torch.nn.Module):
     """
 
     def __init__(self, n_feature, 
-        n_pixel=28, in_channel=1, out_channel=7, kernel_size=3, stride=1, keepprob=0.2):
+        in_channel=1, out_channel=7, n_pixel=28, kernel_size=3, stride=1, keepprob=0.2):
         """
         Args:
         - n_feature:   size of the output feature (output of CNN)
@@ -77,95 +77,29 @@ class SimpleImage2Vec(torch.nn.Module):
 
 
 
-class Image2Vec(torch.nn.Module):
-    """
-    Convert an image into a feature vector using CNNs
-    """
-    def __init__(self, in_channel, nz):
-        """
-        Args:
-        - nz:         size of the discriminative feature
-        - in_channel: number of in channels for an image
-        """
-        super(Image2Vec, self).__init__()
-        self.conv = torch.nn.Sequential(
-            # input is (in_channel) x 64 x 64 / 28 x 28
-            torch.nn.Conv2d(in_channel, nz, 4, 2, 1, bias=False),
-            torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz) x 32 x 32 / 14 x 14
-            torch.nn.Conv2d(nz, nz * 2, 4, 2, 1, bias=False),
-            torch.nn.BatchNorm2d(nz * 2),
-            torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz*2) x 16 x 16 / 7 x 7
-            torch.nn.Conv2d(nz * 2, nz * 4, 4, 2, 1, bias=False),
-            torch.nn.BatchNorm2d(nz * 4),
-            torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz*4) x 8 x 8 / 3 x 3
-            torch.nn.Conv2d(nz * 4, nz * 8, 4, 2, 1, bias=False),
-            torch.nn.BatchNorm2d(nz * 8),
-            torch.nn.LeakyReLU(0.2, inplace=True),
-            # # state size. (nz*8) x 4 x 4 / 1 x 1
-        )
-        self.fc = torch.nn.Linear((nz*8) * 1 * 1, nz)
-
-    def forward(self, X):
-        """
-        customized forward function.
-
-        input
-        - Z:     [batch_size, nz]
-        output
-        - X:     [batch_size, out_channel, 64, 64]
-        """
-        X_tilde = self.conv(X)
-        X_tilde = torch.flatten(X_tilde, 1)
-        Z       = self.fc(X_tilde)
-        Z       = F.relu(Z)
-        return Z
-
-
-    
-class Generator(torch.nn.Module):
+class SimpleGenerator(torch.nn.Module):
     """
     Generator
 
     Restore an image from a feature vector using transposed convolution
     """
 
-    def __init__(self, nz, ngz, out_channel):
+    def __init__(self, n_feature, out_channel, n_pixel=28, keepprob=0.2):
         """
         Args:
         - nz:          size of the input feature (input of transposed CNN)
         - ngz:         size of the generative feature
         - out_channel: number of out channels from transposed CNN
         """
-        super(Generator, self).__init__()
-        self.trans_conv = torch.nn.Sequential(
-            # input is Z, going into a convolution
-            torch.nn.ConvTranspose2d(nz, ngz * 8, 4, 1, 0, bias=False),
-            torch.nn.BatchNorm2d(ngz * 8),
-            torch.nn.ReLU(True),
-            # state size. (ngz*8) x 4 x 4
-            torch.nn.ConvTranspose2d(ngz * 8, ngz * 4, 4, 2, 1, bias=False),
-            torch.nn.BatchNorm2d(ngz * 4),
-            torch.nn.ReLU(True),
-            # state size. (ngz*4) x 8 x 8
-            torch.nn.ConvTranspose2d(ngz * 4, ngz * 2, 4, 2, 1, bias=False),
-            torch.nn.BatchNorm2d(ngz * 2),
-            torch.nn.ReLU(True),
-            # state size. (ngz) x 32 x 32
-            torch.nn.ConvTranspose2d(ngz * 2, out_channel, 15, 1, 1, bias=False),
-            torch.nn.Tanh()
-            # state size. (out_channel) x 64 x 64
-        )
-        # # state size. (ngz*2) x 16 x 16
-        # torch.nn.ConvTranspose2d(ngz * 2, ngz, 4, 2, 1, bias=False),
-        # torch.nn.BatchNorm2d(ngz),
-        # torch.nn.ReLU(True),
-        # # state size. (ngz) x 32 x 32
-        # torch.nn.ConvTranspose2d(ngz, out_channel, 4, 2, 1, bias=False),
-        # torch.nn.Tanh()
-        # # state size. (out_channel) x 64 x 64
+        super(SimpleGenerator, self).__init__()
+        self.out_channel = out_channel
+        self.n_pixel     = n_pixel
+        self.fc1 = torch.nn.Linear(n_feature, 128)
+        self.fc2 = torch.nn.Linear(128, 256)
+        self.fc3 = torch.nn.Linear(256, out_channel * n_pixel * n_pixel)
+        self.dropout1  = torch.nn.Dropout(keepprob)
+        self.dropout2  = torch.nn.Dropout(keepprob)
+        self.dropout3  = torch.nn.Dropout(keepprob)
 
     def forward(self, Z):
         """
@@ -176,5 +110,112 @@ class Generator(torch.nn.Module):
         output
         - X:     [batch_size, out_channel, 64, 64]
         """
-        X = self.trans_conv(Z)
+        batch_size = Z.shape[0]
+        # fully-connected layer
+        Z = self.fc1(Z)
+        Z = self.dropout1(Z)
+        Z = F.relu(Z)
+        Z = self.fc2(Z)
+        Z = self.dropout2(Z)
+        Z = F.relu(Z)
+        Z = self.fc3(Z)
+        Z = self.dropout3(Z)
+        X = F.relu(Z)
+        X = X.view(batch_size, self.out_channel, self.n_pixel, self.n_pixel)
         return X
+
+
+
+# class Image2Vec(torch.nn.Module):
+#     """
+#     Convert an image into a feature vector using CNNs
+#     """
+#     def __init__(self, in_channel, nz):
+#         """
+#         Args:
+#         - nz:         size of the discriminative feature
+#         - in_channel: number of in channels for an image
+#         """
+#         super(Image2Vec, self).__init__()
+#         self.conv = torch.nn.Sequential(
+#             # input is (in_channel) x 64 x 64 / 28 x 28
+#             torch.nn.Conv2d(in_channel, nz, 4, 2, 1, bias=False),
+#             torch.nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (nz) x 32 x 32 / 14 x 14
+#             torch.nn.Conv2d(nz, nz * 2, 4, 2, 1, bias=False),
+#             torch.nn.BatchNorm2d(nz * 2),
+#             torch.nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (nz*2) x 16 x 16 / 7 x 7
+#             torch.nn.Conv2d(nz * 2, nz * 4, 4, 2, 1, bias=False),
+#             torch.nn.BatchNorm2d(nz * 4),
+#             torch.nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (nz*4) x 8 x 8 / 3 x 3
+#             torch.nn.Conv2d(nz * 4, nz * 8, 4, 2, 1, bias=False),
+#             torch.nn.BatchNorm2d(nz * 8),
+#             torch.nn.LeakyReLU(0.2, inplace=True),
+#             # # state size. (nz*8) x 4 x 4 / 1 x 1
+#         )
+#         self.fc = torch.nn.Linear((nz*8) * 1 * 1, nz)
+
+#     def forward(self, X):
+#         """
+#         customized forward function.
+
+#         input
+#         - Z:     [batch_size, nz]
+#         output
+#         - X:     [batch_size, out_channel, 64, 64]
+#         """
+#         X_tilde = self.conv(X)
+#         X_tilde = torch.flatten(X_tilde, 1)
+#         Z       = self.fc(X_tilde)
+#         Z       = F.relu(Z)
+#         return Z
+
+
+
+# class Generator(torch.nn.Module):
+#     """
+#     Generator
+
+#     Restore an image from a feature vector using transposed convolution
+#     """
+
+#     def __init__(self, nz, ngz, out_channel):
+#         """
+#         Args:
+#         - nz:          size of the input feature (input of transposed CNN)
+#         - ngz:         size of the generative feature
+#         - out_channel: number of out channels from transposed CNN
+#         """
+#         super(Generator, self).__init__()
+#         self.trans_conv = torch.nn.Sequential(
+#             # input is Z, going into a convolution
+#             torch.nn.ConvTranspose2d(nz, ngz * 8, 6, 2, 0, bias=False),
+#             torch.nn.BatchNorm2d(ngz * 8),
+#             torch.nn.ReLU(True),
+#             # state size. (ngz*8) x 4 x 4
+#             torch.nn.ConvTranspose2d(ngz * 8, ngz * 4, 4, 2, 1, bias=False),
+#             torch.nn.BatchNorm2d(ngz * 4),
+#             torch.nn.ReLU(True),
+#             # state size. (ngz*4) x 8 x 8
+#             # torch.nn.ConvTranspose2d(ngz * 4, ngz * 2, 4, 2, 1, bias=False),
+#             # torch.nn.BatchNorm2d(ngz * 2),
+#             # torch.nn.ReLU(True),
+#             # state size. (ngz) x 32 x 32
+#             torch.nn.ConvTranspose2d(ngz * 4, out_channel, 8, 2, 1, bias=False),
+#             torch.nn.Tanh()
+#             # state size. (out_channel) x 64 x 64
+#         )
+
+#     def forward(self, Z):
+#         """
+#         customized forward function.
+
+#         input
+#         - Z:     [batch_size, n_feature]
+#         output
+#         - X:     [batch_size, out_channel, 64, 64]
+#         """
+#         X = self.trans_conv(Z)
+#         return X

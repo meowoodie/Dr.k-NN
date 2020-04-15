@@ -3,6 +3,9 @@
 
 """
 Robust Generative Adversarial Network
+
+Reference:
+- DCGAN PyTorch: https://github.com/pytorch/examples/blob/master/dcgan/main.py
 """
 
 import nn
@@ -18,13 +21,16 @@ import matplotlib.pyplot as plt
 
 
 
-def train(model, trainloader, n_epoch=10, log_interval=10, lr=1e-2, num_img=3):
+def train(model, trainloader, batch_size, K=5, n_epoch=10, log_interval=10, dlr=1e-2, glr=1e-2, num_img=3):
     """training procedure"""
-    optD = optim.Adam(model.netD.parameters(), lr=lr)
-    optG = optim.Adam(model.netG.parameters(), lr=lr)
+    optD = optim.Adam(model.netD.parameters(), lr=dlr)
+    optG = optim.Adam(model.netG.parameters(), lr=glr)
 
     for epoch in range(n_epoch):
         for batch_idx, (X, Y) in enumerate(trainloader, 0):
+            if X.shape[0] != batch_size:
+                print("[%s] data in current batch are insufficient." % arrow.now())
+                continue
             model.train()
             # train discriminator
             model.netD.zero_grad()
@@ -34,11 +40,12 @@ def train(model, trainloader, n_epoch=10, log_interval=10, lr=1e-2, num_img=3):
             optD.step()
             
             # train generator
-            model.netG.zero_grad()
-            p_hat, _ = model(X)
-            lossG    = - 1 * utils.tvloss(p_hat)
-            lossG.backward()
-            optG.step()
+            for k in range(K):
+                model.netG.zero_grad()
+                p_hat, _ = model(X)
+                lossG    = - 1 * utils.tvloss(p_hat)
+                lossG.backward()
+                optG.step()
             
             if batch_idx % log_interval == 0:
                 print("[%s] Epoch: %d\tTrain batch: %d\tD Loss: %.3f,\tG Loss: %.3f" % \
@@ -46,11 +53,10 @@ def train(model, trainloader, n_epoch=10, log_interval=10, lr=1e-2, num_img=3):
                 generate(model, num_img)
 
 def generate(model, num_img):
+    """generate procedure"""
     model.eval()
-    noise     = torch.randn(num_img, model.nz, 1, 1)
+    noise     = torch.randn(num_img, model.nz)
     fake_imgs = model.netG(noise).detach().numpy()
-    print(fake_imgs.shape)
-
     cmap = cm.get_cmap('Greys')
     for img in fake_imgs:
         fig, ax = plt.subplots(1, 1)
@@ -73,8 +79,8 @@ class RobustGAN(torch.nn.Module):
         self.nc        = nc
         self.n_sample  = n_sample
         # networks of discriminator and generator
-        self.netG      = nn.Generator(nz, ngz, nc)
-        self.netD      = nn.Image2Vec(nc, nz)
+        self.netG      = nn.SimpleGenerator(n_feature=nz, out_channel=nc)
+        self.netD      = nn.SimpleImage2Vec(n_feature=nz, in_channel=nc)
         # robust classifier layer
         # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
         #       since it is one of the attributes defined in the model.
@@ -89,7 +95,7 @@ class RobustGAN(torch.nn.Module):
         - noise: [batch_size, nz, 1, 1]
         """
         # random noise and its fake generation
-        noise  = torch.randn(X.shape[0], self.nz, 1, 1)
+        noise  = torch.randn(X.shape[0], self.nz)
         fake_X = self.netG(noise)
         # discriminator loss
         p_hat  = self.D(X, fake_X)
@@ -139,9 +145,9 @@ if __name__ == "__main__":
     # x_hat   = vec2img(z_hat)
     # print(x_hat.shape)
 
-    nz         = 10
-    nc         = 1
-    ngz        = 5
+    nz         = 10 # size of feature vector
+    ngz        = 5  # size of intermediate (generator) feature vector
+    nc         = 1  # number of channels of images
     n_sample   = 10
     batch_size = 100
 
@@ -157,7 +163,7 @@ if __name__ == "__main__":
         transforms.Normalize((0.1307,), (0.3081,))
     ]))
 
-    idx = get_indices(dataset, 1)
+    idx = get_indices(dataset, 4)
 
     trainloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size,
@@ -168,4 +174,4 @@ if __name__ == "__main__":
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
     # training
-    train(model, trainloader, n_epoch=10, log_interval=5, lr=1e-2)
+    train(model, trainloader, batch_size, K=8, n_epoch=10, log_interval=20, dlr=1e-4, glr=2e-2)
