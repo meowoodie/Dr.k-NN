@@ -13,14 +13,19 @@ import robustclassifier as rc
 import torch.optim as optim
 from torchvision import datasets, transforms
 
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 
-def train(model, trainloader, n_epoch=10, log_interval=10, lr=1e-2):
-    """training procedure for one epoch"""
+
+
+def train(model, trainloader, n_epoch=10, log_interval=10, lr=1e-2, num_img=3):
+    """training procedure"""
     optD = optim.Adam(model.netD.parameters(), lr=lr)
     optG = optim.Adam(model.netG.parameters(), lr=lr)
 
     for epoch in range(n_epoch):
         for batch_idx, (X, Y) in enumerate(trainloader, 0):
+            model.train()
             # train discriminator
             model.netD.zero_grad()
             p_hat, _ = model(X)
@@ -36,8 +41,24 @@ def train(model, trainloader, n_epoch=10, log_interval=10, lr=1e-2):
             optG.step()
             
             if batch_idx % log_interval == 0:
-                print("[%s] Train batch: %d\tD Loss: %.3f,\tG Loss: %.3f" % \
-                    (arrow.now(), batch_idx, lossD.item(), lossG.item()))
+                print("[%s] Epoch: %d\tTrain batch: %d\tD Loss: %.3f,\tG Loss: %.3f" % \
+                    (arrow.now(), epoch, batch_idx, lossD.item(), lossG.item()))
+                generate(model, num_img)
+
+def generate(model, num_img):
+    model.eval()
+    noise     = torch.randn(num_img, model.nz, 1, 1)
+    fake_imgs = model.netG(noise).detach().numpy()
+    print(fake_imgs.shape)
+
+    cmap = cm.get_cmap('Greys')
+    for img in fake_imgs:
+        fig, ax = plt.subplots(1, 1)
+        img     = img[0]
+        implot  = ax.imshow(img, vmin=img.min(), vmax=img.max(), cmap=cmap)
+        plt.axis('off')
+        plt.savefig("results/fake_img_%s.pdf" % arrow.now(), bbox_inches='tight')
+        plt.clf()
 
 
 
