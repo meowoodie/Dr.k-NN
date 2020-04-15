@@ -7,8 +7,6 @@ import plots
 import utils
 import dataloader
 import robustclassifier as rc
-import torch.optim as optim
-from torch.optim.lr_scheduler import StepLR
 
 def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     """
@@ -101,12 +99,12 @@ def main():
     classes     = [0, 1]
     n_class     = len(classes)
     n_feature   = 2
-    n_sample    = 9 # 12
+    n_sample    = 6 # 12
     max_theta   = 1e-2
     batch_size  = 10
     # training parameters
     epochs      = 2
-    lr          = 1e-2
+    
     gamma       = 0.7
 
     # init model
@@ -117,10 +115,8 @@ def main():
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
     # training
-    optimizer   = optim.Adadelta(model.parameters(), lr=lr)
-    scheduler   = StepLR(optimizer, step_size=1, gamma=gamma)
-    rc.train(model, optimizer, trainloader, testloader=None, n_iter=150, log_interval=5)
-    search_through(model, trainloader, testloader, K=5, h=8e-3)
+    rc.train(model, trainloader, testloader=testloader, n_iter=150, log_interval=5, lr=1e-2)
+    # search_through(model, trainloader, testloader, K=5, h=8e-3)
     
     # test
     # Ks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

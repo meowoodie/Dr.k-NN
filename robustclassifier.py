@@ -25,7 +25,7 @@ import torch
 import plots
 import cvxpy as cp
 import numpy as np
-# import matplotlib.pyplot as plt
+import torch.optim as optim
 from cvxpylayers.torch import CvxpyLayer
 
 # TEST METHODS
@@ -85,7 +85,7 @@ def kernel_smoother(H_test, H_train, p_hat_train, h=1e-1):
 
 # GENERAL TRAIN PROCEDURE
 
-def train(model, trainloader, testloader=None, n_iter=100, log_interval=10):
+def train(model, trainloader, testloader=None, n_iter=100, log_interval=10, lr=1e-2):
     """training procedure for one epoch"""
     # NOTE: gradient for loss is expected to be None, 
     #       since it is not leaf node. (it's root node)
@@ -103,7 +103,6 @@ def train(model, trainloader, testloader=None, n_iter=100, log_interval=10):
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
                 test(model, trainloader, testloader, K=5, h=1e-1)
-                utils.visualize_embedding(H_test, p_hat_test, useTSNE=False)
         if batch_idx > n_iter:
             break
         
