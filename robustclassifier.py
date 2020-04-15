@@ -85,10 +85,11 @@ def kernel_smoother(H_test, H_train, p_hat_train, h=1e-1):
 
 # GENERAL TRAIN PROCEDURE
 
-def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interval=10):
+def train(model, trainloader, testloader=None, n_iter=100, log_interval=10):
     """training procedure for one epoch"""
     # NOTE: gradient for loss is expected to be None, 
     #       since it is not leaf node. (it's root node)
+    optimizer = optim.Adadelta(model.parameters(), lr=lr)
     for batch_idx, (X, Y) in enumerate(trainloader):
         model.train()
         Q = utils.sortedY2Q(Y)      # calculate empirical distribution based on labels
@@ -110,7 +111,7 @@ def train(model, optimizer, trainloader, testloader=None, n_iter=100, log_interv
 
 def test(model, trainloader, testloader, K=5, h=1e-1):
     """testing procedure"""
-    
+
     # given hidden embedding, evaluate corresponding p_hat 
     # using the output of the robust classifier layer
     def evaluate_p_hat(H, Q, theta):
