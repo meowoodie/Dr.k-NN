@@ -89,24 +89,24 @@ class Image2Vec(torch.nn.Module):
         """
         super(Image2Vec, self).__init__()
         self.conv = torch.nn.Sequential(
-            # input is (in_channel) x 64 x 64
+            # input is (in_channel) x 64 x 64 / 28 x 28
             torch.nn.Conv2d(in_channel, nz, 4, 2, 1, bias=False),
             torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz) x 32 x 32
+            # state size. (nz) x 32 x 32 / 14 x 14
             torch.nn.Conv2d(nz, nz * 2, 4, 2, 1, bias=False),
             torch.nn.BatchNorm2d(nz * 2),
             torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz*2) x 16 x 16
+            # state size. (nz*2) x 16 x 16 / 7 x 7
             torch.nn.Conv2d(nz * 2, nz * 4, 4, 2, 1, bias=False),
             torch.nn.BatchNorm2d(nz * 4),
             torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz*4) x 8 x 8
+            # state size. (nz*4) x 8 x 8 / 3 x 3
             torch.nn.Conv2d(nz * 4, nz * 8, 4, 2, 1, bias=False),
             torch.nn.BatchNorm2d(nz * 8),
             torch.nn.LeakyReLU(0.2, inplace=True),
-            # state size. (nz*8) x 4 x 4
+            # # state size. (nz*8) x 4 x 4 / 1 x 1
         )
-        self.fc = torch.nn.Linear((nz*8) * 4 * 4, nz)
+        self.fc = torch.nn.Linear((nz*8) * 1 * 1, nz)
 
     def forward(self, X):
         """
@@ -140,7 +140,7 @@ class Generator(torch.nn.Module):
         - out_channel: number of out channels from transposed CNN
         """
         super(Generator, self).__init__()
-        self.main = torch.nn.Sequential(
+        self.trans_conv = torch.nn.Sequential(
             # input is Z, going into a convolution
             torch.nn.ConvTranspose2d(nz, ngz * 8, 4, 1, 0, bias=False),
             torch.nn.BatchNorm2d(ngz * 8),
@@ -153,15 +153,19 @@ class Generator(torch.nn.Module):
             torch.nn.ConvTranspose2d(ngz * 4, ngz * 2, 4, 2, 1, bias=False),
             torch.nn.BatchNorm2d(ngz * 2),
             torch.nn.ReLU(True),
-            # state size. (ngz*2) x 16 x 16
-            torch.nn.ConvTranspose2d(ngz * 2, ngz, 4, 2, 1, bias=False),
-            torch.nn.BatchNorm2d(ngz),
-            torch.nn.ReLU(True),
             # state size. (ngz) x 32 x 32
-            torch.nn.ConvTranspose2d(ngz, out_channel, 4, 2, 1, bias=False),
+            torch.nn.ConvTranspose2d(ngz * 2, out_channel, 15, 1, 1, bias=False),
             torch.nn.Tanh()
             # state size. (out_channel) x 64 x 64
         )
+        # # state size. (ngz*2) x 16 x 16
+        # torch.nn.ConvTranspose2d(ngz * 2, ngz, 4, 2, 1, bias=False),
+        # torch.nn.BatchNorm2d(ngz),
+        # torch.nn.ReLU(True),
+        # # state size. (ngz) x 32 x 32
+        # torch.nn.ConvTranspose2d(ngz, out_channel, 4, 2, 1, bias=False),
+        # torch.nn.Tanh()
+        # # state size. (out_channel) x 64 x 64
 
     def forward(self, Z):
         """
@@ -172,5 +176,5 @@ class Generator(torch.nn.Module):
         output
         - X:     [batch_size, out_channel, 64, 64]
         """
-        X = self.main(Z)
+        X = self.trans_conv(Z)
         return X
