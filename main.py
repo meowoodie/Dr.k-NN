@@ -111,7 +111,7 @@ def main():
     model       = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
     trainloader = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=True, N=10)
     testloader  = dataloader.MiniMnist(classes, batch_size, n_sample, is_train=False, N=200)
-    trainloader.save_figures()
+    # trainloader.save_figures()
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
     # training

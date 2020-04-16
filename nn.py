@@ -95,11 +95,11 @@ class SimpleGenerator(torch.nn.Module):
         self.out_channel = out_channel
         self.n_pixel     = n_pixel
         self.fc1 = torch.nn.Linear(n_feature, 128)
-        self.fc2 = torch.nn.Linear(128, 256)
-        self.fc3 = torch.nn.Linear(256, out_channel * n_pixel * n_pixel)
+        self.fc2 = torch.nn.Linear(128, out_channel * n_pixel * n_pixel)
+        # self.fc3 = torch.nn.Linear(256, out_channel * n_pixel * n_pixel)
         self.dropout1  = torch.nn.Dropout(keepprob)
         self.dropout2  = torch.nn.Dropout(keepprob)
-        self.dropout3  = torch.nn.Dropout(keepprob)
+        # self.dropout3  = torch.nn.Dropout(keepprob)
 
     def forward(self, Z):
         """
@@ -118,10 +118,10 @@ class SimpleGenerator(torch.nn.Module):
         Z = self.fc2(Z)
         Z = self.dropout2(Z)
         Z = F.relu(Z)
-        Z = self.fc3(Z)
-        Z = self.dropout3(Z)
-        X = F.relu(Z)
-        X = X.view(batch_size, self.out_channel, self.n_pixel, self.n_pixel)
+        # Z = self.fc3(Z)
+        # Z = self.dropout3(Z)
+        # Z = F.relu(Z)
+        X = Z.view(batch_size, self.out_channel, self.n_pixel, self.n_pixel)
         return X
 
 

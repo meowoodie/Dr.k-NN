@@ -181,7 +181,7 @@ class RobustImageClassifier(torch.nn.Module):
         self.n_feature = n_feature
         # Image to Vec layer
         self.data2vec  = nn.SimpleImage2Vec(n_feature, 
-            n_pixel, in_channel, out_channel, kernel_size, stride, keepprob)
+            in_channel, out_channel, n_pixel, kernel_size, stride, keepprob)
         # robust classifier layer
         # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
         #       since it is one of the attributes defined in the model.
