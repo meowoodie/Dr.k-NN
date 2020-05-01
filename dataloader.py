@@ -12,36 +12,36 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from itertools import combinations 
-from torchvision import datasets
 
 np.random.seed(1)
 
-class MiniMnist(torch.utils.data.Dataset):
+class MiniSetLoader(torch.utils.data.Dataset):
     """
-    Dataloader for a mini MNIST
+    Dataloader in a ``mini-set'' fashion.
 
-    This data loader only utilizes a very small portion of data in MNIST, which contains `N` images 
+    This data loader only utilizes a very small portion of data in dataset, which contains `N` points 
     for each category (`2 * N` in total). Every iteration, the data loader would yield a batch of 
     sample sets, where each sample set contains `n_sample` samples and each class in this set at least 
     has one sample. 
 
     You may be able to access:
-    - self.data and self.targets for the whole dataset in MNIST
+    - self.data and self.targets for the whole dataset
     - self.X and self.Y for the selected mini dataset
 
     or iterate the dataloader to access the mini dataset in an iterative fashion.
     """
 
-    def __init__(self, classes, batch_size, n_sample, is_train=True, N=50):
+    def __init__(self, dataset, classes, batch_size, n_sample, is_normalized=True, N=50):
         """
         Args:
+        - dataset:    specified dataset, such as `datasets.MNIST("data", train=is_train, download=True)'
         - classes:    selected classes in the dataset (from 0 to 9)
         - batch_size: number of sets of samples in one batch
         - n_sample:   number of samples in one set.
         - N:          total number of samples for each class
         """
         # MNIST dataset
-        self.dataset    = datasets.MNIST("data", train=is_train, download=True)
+        self.dataset    = dataset # datasets.MNIST("data", train=is_train, download=True)
         # configurations
         assert n_sample < N, "n_sample (%d) should be less than N (%d)." % (n_sample, N)
         self.classes    = classes
@@ -51,9 +51,12 @@ class MiniMnist(torch.utils.data.Dataset):
         self.n_sampless = self._random_split_n_classes() # all possible combinations of  
 
         # data extraction and normalization
-        self.data    = (self.dataset.data.float() - torch.min(self.dataset.data).float()) /\
-            (torch.max(self.dataset.data).float() - torch.min(self.dataset.data).float())
+        self.data    = self.dataset.data \
+            if is_normalized \
+            else (self.dataset.data.float() - torch.min(self.dataset.data).float()) /\
+                (torch.max(self.dataset.data).float() - torch.min(self.dataset.data).float())
         self.targets = self.dataset.targets
+
 
         # only keep classes specified in the argument `classes` from the dataset
         n        = self.targets.shape[0] # total number of samples
@@ -129,9 +132,23 @@ class MiniMnist(torch.utils.data.Dataset):
                 bbox_inches='tight')
             plt.clf()
 
+# SYNTHETIC DATASETS
 
+class SyntheticGaussianDataset(object):
+    """
+    """
 
-# class MiniImageNet(torch.utils.data.Dataset):
-
-if __name__ == "__main__":
-    pass
+    def __init__(self, n_class, means, covs, N):
+        assert n_class == len(means) and n_class == len(covs), \
+            "n_class (%d) should be consistent with the number of sets of means and variance (%d, %d)." % \
+            (n_class, len(means), len(covs))
+        
+        self.data    = []
+        self.targets = []
+        for y, (mean, cov) in enumerate(zip(means, covs)):
+            X = np.random.multivariate_normal(mean, cov, N)
+            Y = y * np.ones(N)
+            self.data.append(X)
+            self.targets.append(Y)
+        self.data    = np.concatenate(self.data)
+        self.targets = np.concatenate(self.targets)

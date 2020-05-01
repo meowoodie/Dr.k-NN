@@ -95,7 +95,8 @@ def train(model, trainloader, testloader=None, n_iter=100, log_interval=10, lr=1
         Q = utils.sortedY2Q(Y)      # calculate empirical distribution based on labels
         optimizer.zero_grad()       # init optimizer (set gradient to be zero)
         p_hat = model(X, Q)         # inference
-        loss  = utils.tvloss(p_hat) # calculate tv loss
+        loss  = utils.tvloss(p_hat) # calculate total variation loss
+        # loss  = utils.celoss(p_hat) # calculate cross entropy loss
         loss.backward()             # gradient descent
         optimizer.step()            # update optimizer
         if batch_idx % log_interval == 0:
@@ -318,8 +319,10 @@ class RobustClassifierLayer(torch.nn.Module):
                 cons += [cp.sum(gamma[k], axis=1)[l] == Q[k, l]]
 
         # Problem setup
-        # obj   = cp.Minimize(cp.sum(cp.max(p, axis=0)))
+        # tv loss
         obj   = cp.Maximize(cp.sum(cp.min(p, axis=0)))
+        # cross entropy loss
+        # obj   = cp.Minimize(cp.sum(- cp.sum(p * cp.log(p), axis=0)))
         prob  = cp.Problem(obj, cons)
         assert prob.is_dpp()
 
@@ -327,3 +330,89 @@ class RobustClassifierLayer(torch.nn.Module):
         # stack operation ('torch.stack(gamma_hat, axis=1)') is needed for the output of this layer
         # to convert the output tensor into a normal shape, i.e., [batch_size, n_class, n_sample, n_sample]
         return CvxpyLayer(prob, parameters=[theta, Q, C], variables=gamma)
+
+# OTHERS
+
+def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
+    """
+    search through the embedding space, return the corresponding p_hat of a set of uniformly 
+    sampled points in the space.
+
+    NOTE: now it only supports 2D embedding space
+    """
+    # given hidden embedding, evaluate corresponding p_hat 
+    # using the output of the robust classifier layer
+    def evaluate_p_hat(H, Q, theta):
+        n_class, n_sample, n_feature = theta.shape[1], H.shape[1], H.shape[2]
+        rbstclf = RobustClassifierLayer(n_class, n_sample, n_feature)
+        return rbstclf(H, Q, theta).data
+
+    assert model.n_feature == 2
+    # fetch data from trainset and testset
+    X_train = trainloader.X.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
+    Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
+    X_test  = testloader.X.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
+    Y_test  = testloader.Y                                # [n_test_sample]
+    # get H (embeddings) and p_hat for trainset and testset
+    model.eval()
+    with torch.no_grad():
+        Q       = utils.sortedY2Q(Y_train)                # [1, n_class, n_sample]
+        H_train = model.data2vec(X_train)                 # [n_train_sample, n_feature]
+        H_test  = model.data2vec(X_test)                  # [n_test_sample, n_feature]
+        theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
+        p_hat   = evaluate_p_hat(
+            H_train.unsqueeze(0), Q, theta).squeeze(0)    # [n_class, n_train_sample]
+    # uniformly sample points in the embedding space
+    # - the limits of the embedding space
+    min_H        = torch.cat((H_train, H_test), 0).min(dim=0)[0].numpy()
+    max_H        = torch.cat((H_train, H_test), 0).max(dim=0)[0].numpy()
+    min_H, max_H = min_H - (max_H - min_H) * .1, max_H + (max_H - min_H) * .1
+    H_space      = [ np.linspace(min_h, max_h, n_grid + 1)[:-1] 
+        for min_h, max_h in zip(min_H, max_H) ]           # (n_feature [n_grid])
+    H            = [ [x, y] for x in H_space[0] for y in H_space[1] ]
+    H            = torch.Tensor(H)                        # [n_grid * n_grid, n_feature]
+    # perform test
+    p_hat_knn    = knn_regressor(H, H_train, p_hat, K)    # [n_class, n_grid * n_grid]
+    p_hat_kernel = kernel_smoother(H, H_train, p_hat, h)  # [n_class, n_grid * n_grid]
+
+    plots.visualize_2Dspace_2class(
+        n_grid, max_H, min_H, p_hat_knn,
+        H_train, Y_train, H_test, Y_test, prefix="test")
+
+    # # perform boundary knn test
+    # _p_hat         = p_hat[0] / (p_hat[0] + p_hat[1])
+    # print(_p_hat)
+    # _indices       = ((_p_hat > 0.05) * (_p_hat < 0.95)).nonzero().flatten()
+    # print(_indices)
+    # bdry_p_hat     = p_hat[:, _indices]
+    # bdry_H_train   = H_train[_indices]
+    # bdry_Y_train   = Y_train[:, _indices]
+    # print(bdry_p_hat.shape, bdry_H_train.shape)
+    # bdry_p_hat_knn = knn_regressor(H, bdry_H_train, bdry_p_hat, 2)  # [n_class, n_grid * n_grid]
+
+    # # plot the space and the training point
+    # plots.visualize_2Dspace_LFD(
+    #     n_grid, max_H, min_H, p_hat_kernel, 0,
+    #     H_train, Y_train, H_test, Y_test, prefix="class0")
+    # plots.visualize_2Dspace_LFD(
+    #     n_grid, max_H, min_H, p_hat_kernel, 1,
+    #     H_train, Y_train, H_test, Y_test, prefix="class1")
+    # plots.visualize_2Dspace_LFD(
+    #     n_grid, max_H, min_H, p_hat_kernel, 2,
+    #     H_train, Y_train, H_test, Y_test, prefix="class2")
+    # plots.visualize_2Dspace_Nclass(
+    #     n_grid, max_H, min_H, p_hat_knn,
+    #     H_train, Y_train, H_test, Y_test, prefix="knn")
+
+    # plots.visualize_2Dspace_2class_boundary(
+    #     n_grid, max_H, min_H, p_hat_knn,
+    #     H_train, Y_train, H_test, Y_test, prefix="kernel_boundary")
+    # plots.visualize_2Dspace_2class_boundary(
+    #     n_grid, max_H, min_H, p_hat_kernel,
+    #     H_train, Y_train, H_test, Y_test, prefix="knn_boundary")
+    # plots.visualize_2Dspace_Nclass(
+    #     n_grid, max_H, min_H, p_hat_knn,
+    #     H_train, Y_train, H_test, Y_test, prefix="knn")
+    # plots.visualize_2Dspace_Nclass(
+    #     n_grid, max_H, min_H, bdry_p_hat_knn,
+    #     bdry_H_train, bdry_Y_train, H_test, Y_test, prefix="knn_boundary_select")

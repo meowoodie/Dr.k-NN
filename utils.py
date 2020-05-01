@@ -20,6 +20,11 @@ def tvloss(p_hat):
     p_min, _ = torch.min(p_hat, dim=1) # [batch_size, n_sample]
     return p_min.sum(dim=1).mean()     # scalar
 
+def celoss(p_hat):
+    """cross entropy loss"""
+    crossentropy = - p_hat * torch.log(p_hat) # [batch_size, n_sample]
+    return crossentropy.sum(dim=1).mean()     # scalar
+
 def pairwise_dist(X, Y):
     """
     calculate pairwise l2 distance between X and Y
