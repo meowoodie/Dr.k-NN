@@ -103,7 +103,7 @@ def train(model, trainloader, testloader=None, n_iter=100, log_interval=10, lr=1
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                test(model, trainloader, testloader, K=5, h=1e-1)
+                test(model, trainloader, testloader, K=5, h=1e-3)
         if batch_idx > n_iter:
             break
         

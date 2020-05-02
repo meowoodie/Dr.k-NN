@@ -29,11 +29,11 @@ class Vec2Vec(torch.nn.Module):
         """
         super(Vec2Vec, self).__init__()
         # fully connected layer 1
-        self.fc1      = torch.nn.Linear(n_data, 500)
+        self.fc1      = torch.nn.Linear(n_data, 200)
         # dropout layer 1
         self.dropout1 = torch.nn.Dropout(keepprob)
         # fully connected layer 2
-        self.fc2      = torch.nn.Linear(500, n_feature)
+        self.fc2      = torch.nn.Linear(200, n_feature)
         # dropout layer 2
         self.dropout2 = torch.nn.Dropout(keepprob)
         # fully connected layer 3

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from itertools import combinations 
 from sklearn.datasets import make_swiss_roll
 
-np.random.seed(3)
+np.random.seed(15)
 
 class MiniSetLoader(torch.utils.data.Dataset):
     """
@@ -149,7 +149,7 @@ class SyntheticGaussianDataset(object):
         self.targets = []
         for y, (mean, cov) in enumerate(zip(means, covs)):
             X = np.random.multivariate_normal(mean, cov, N)
-            Y = (y + 1) * np.ones(N)
+            Y = y * np.ones(N)
             self.data.append(X)
             self.targets.append(Y)
         self.data    = torch.Tensor(np.concatenate(self.data))

@@ -35,7 +35,7 @@ def train(model, trainloader, batch_size, K=5, n_epoch=10, log_interval=10, dlr=
             # train discriminator
             model.netD.zero_grad()
             p_hat, _ = model(X)
-            lossD    = utils.tvloss(p_hat)
+            lossD    = utils.celoss(p_hat)
             lossD.backward()
             optD.step()
             
@@ -43,7 +43,7 @@ def train(model, trainloader, batch_size, K=5, n_epoch=10, log_interval=10, dlr=
             for k in range(K):
                 model.netG.zero_grad()
                 p_hat, _ = model(X)
-                lossG    = - 1 * utils.tvloss(p_hat)
+                lossG    = - 1 * utils.celoss(p_hat)
                 lossG.backward()
                 optG.step()
             
@@ -174,4 +174,4 @@ if __name__ == "__main__":
     print("[%s]\n%s" % (arrow.now(), trainloader))
 
     # training
-    train(model, trainloader, batch_size, K=8, n_epoch=10, log_interval=20, dlr=1e-4, glr=2e-2)
+    train(model, trainloader, batch_size, K=5, n_epoch=10, log_interval=20, dlr=1e-5, glr=1e-2)

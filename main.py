@@ -42,17 +42,23 @@ def synthetic_main():
     # model configurations
     classes     = [0, 1]
     n_class     = len(classes)
-    n_feature   = 1000
+    n_feature   = 100
     n_sample    = 10 # 12
-    max_theta   = 1e-3
+    max_theta   = 1e-2
     batch_size  = 10
     n_grid      = 100
-    n_iter      = 10
-    n_train     = 50
+    n_iter      = 20
+    n_train     = 20
+
+    means       = [[0, -2], [0, 2]]
+    covs        = [
+        [[4, 0.3], [0.3, 4]], 
+        [[12, 1], [1, 1]]]
 
     # load synthetic dataset
-    dataset     = dataloader.SyntheticSwissrollDataset(N=500)
-    testloader  = dataloader.MiniSetLoader(dataset, classes, batch_size, n_sample, is_normalized=False, N=500)
+    # dataset     = dataloader.SyntheticSwissrollDataset(N=500)
+    dataset     = dataloader.SyntheticGaussianDataset(n_class, means, covs, N=1000)
+    testloader  = dataloader.MiniSetLoader(dataset, classes, batch_size, n_sample, is_normalized=False, N=200)
     trainloader = dataloader.MiniSetLoader(dataset, classes, batch_size, n_sample, is_normalized=False, N=n_train)
     X_train, Y_train = trainloader.X, trainloader.Y
     X_test, Y_test   = testloader.X, testloader.Y
@@ -62,7 +68,7 @@ def synthetic_main():
     # Train DR k-NN
     # init model
     model = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
-    rc.train(model, trainloader, testloader=testloader, n_iter=n_iter, log_interval=5, lr=1e-2)
+    rc.train(model, trainloader, testloader=testloader, n_iter=n_iter, log_interval=5, lr=1e-4)
 
     # DR k-NN results
     # - define robust classifier without neural networks
@@ -76,11 +82,15 @@ def synthetic_main():
         theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
         p_hat   = rclayer(H_train.unsqueeze(0), Q, theta).data.squeeze(0) # [n_class, n_train_sample]
     # - perform classification for the space
-    p_hat_knn = rc.knn_regressor(H, H_train, p_hat, K=5) # [n_class, n_grid * n_grid]
+    p_hat_knn = rc.knn_regressor(H, H_train, p_hat, K=5)      # [n_class, n_grid * n_grid]
+    # p_hat_ks  = rc.kernel_smoother(H, H_train, p_hat, h=1e-2) # [n_class, n_grid * n_grid]
     # - visualization
     plots.visualize_2Dspace_2class(
         n_grid, max_X, min_X, p_hat_knn,
         X_train, Y_train, X_test, Y_test, prefix="drknn")
+    # plots.visualize_2Dspace_2class(
+    #     n_grid, max_X, min_X, p_hat_ks,
+    #     X_train, Y_train, X_test, Y_test, prefix="kernel")
 
     # Naive k-NN results
     from sklearn.neighbors import KNeighborsClassifier
