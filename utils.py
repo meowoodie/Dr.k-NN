@@ -12,6 +12,7 @@ Dependencies:
 """
 
 import torch 
+import numpy as np
 
 def tvloss(p_hat):
     """TV loss"""
@@ -64,6 +65,16 @@ def sortedY2Q(Y):
             n_k   = N[batch_idx, class_idx].float()
             Q[batch_idx, class_idx, _from:_to] = 1 / n_k
     return Q
+
+def evaluate_2Dspace(X_train, X_test, n_grid):
+    min_X        = np.concatenate((X_train, X_test), 0).min(axis=0)
+    max_X        = np.concatenate((X_train, X_test), 0).max(axis=0)
+    min_X, max_X = min_X - (max_X - min_X) * .2, max_X + (max_X - min_X) * .2
+    X_space      = [ np.linspace(min_x, max_x, n_grid + 1)[:-1] 
+        for min_x, max_x in zip(min_X, max_X) ]           # (n_feature [n_grid])
+    X            = [ [x1, x2] for x1 in X_space[0] for x2 in X_space[1] ]
+    X            = torch.Tensor(X)                        # [n_grid * n_grid, n_feature]
+    return min_X, max_X, X
 
 # def sortbyclass(X, Y):
 #     """

@@ -16,6 +16,56 @@ import cvxpy as cp
 import numpy as np
 import torch.nn.functional as F
 
+class Vec2Vec(torch.nn.Module):
+    """
+    Convert a simple image into a feature vector using a fully-connected NN
+    """
+
+    def __init__(self, n_data, n_feature, keepprob=0.1):
+        """
+        Args:
+        - n_data:    size of the input data (input of NN)
+        - n_feature: size of the output feature (output of NN)
+        """
+        super(Vec2Vec, self).__init__()
+        # fully connected layer 1
+        self.fc1      = torch.nn.Linear(n_data, 500)
+        # dropout layer 1
+        self.dropout1 = torch.nn.Dropout(keepprob)
+        # fully connected layer 2
+        self.fc2      = torch.nn.Linear(500, n_feature)
+        # dropout layer 2
+        self.dropout2 = torch.nn.Dropout(keepprob)
+        # fully connected layer 3
+        # self.fc3      = torch.nn.Linear(1500, n_feature)
+        # # dropout layer 3
+        # self.dropout3 = torch.nn.Dropout(keepprob)
+    
+    def forward(self, X):
+        """
+        customized forward function.
+
+        input
+        - X:     [batch_size, n_data]
+        output
+        - Z:     [batch_size, n_feature]
+        """
+        # fully-connected layer 1
+        Z = self.fc1(X)
+        Z = self.dropout1(Z)
+        Z = F.relu(Z)
+        # fully-connected layer 2
+        Z = self.fc2(Z)
+        Z = self.dropout2(Z)
+        Z = F.relu(Z)
+        # # fully-connected layer 2
+        # Z = self.fc3(Z)
+        # Z = self.dropout3(Z)
+        # Z = F.relu(Z)
+        return Z
+
+
+
 class SimpleImage2Vec(torch.nn.Module):
     """
     Convert a simple image into a feature vector using CNNs

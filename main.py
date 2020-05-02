@@ -6,11 +6,12 @@ import arrow
 import plots
 import utils
 import dataloader
+import numpy as np
 import robustclassifier as rc
 from torchvision import datasets
 
-def main():
-    """train function"""
+def real_main():
+    """main function for real data"""
     # model configurations
     classes     = [4, 6]
     n_class     = len(classes)
@@ -35,7 +36,78 @@ def main():
     rc.search_through(model, trainloader, testloader, K=5, h=8e-3)
 
 
-    
+
+def synthetic_main():
+    """train function for synthetic data"""
+    # model configurations
+    classes     = [0, 1]
+    n_class     = len(classes)
+    n_feature   = 1000
+    n_sample    = 10 # 12
+    max_theta   = 1e-3
+    batch_size  = 10
+    n_grid      = 100
+    n_iter      = 10
+    n_train     = 50
+
+    # load synthetic dataset
+    dataset     = dataloader.SyntheticSwissrollDataset(N=500)
+    testloader  = dataloader.MiniSetLoader(dataset, classes, batch_size, n_sample, is_normalized=False, N=500)
+    trainloader = dataloader.MiniSetLoader(dataset, classes, batch_size, n_sample, is_normalized=False, N=n_train)
+    X_train, Y_train = trainloader.X, trainloader.Y
+    X_test, Y_test   = testloader.X, testloader.Y
+    # the observation space
+    min_X, max_X, X = utils.evaluate_2Dspace(X_train, X_test, n_grid)
+
+    # Train DR k-NN
+    # init model
+    model = rc.RobustImageClassifier(n_class, n_sample, n_feature, max_theta)
+    rc.train(model, trainloader, testloader=testloader, n_iter=n_iter, log_interval=5, lr=1e-2)
+
+    # DR k-NN results
+    # - define robust classifier without neural networks
+    model.eval()
+    rclayer = rc.RobustClassifierLayer(n_class, 2 * n_train, n_feature)
+    with torch.no_grad():
+        Q       = utils.sortedY2Q(Y_train.unsqueeze(0))   # [1, n_class, n_sample]
+        H_train = model.data2vec(X_train)                 # [n_train_sample, n_feature]
+        H_test  = model.data2vec(X_test)                  # [n_test_sample, n_feature]
+        H       = model.data2vec(X)                       # [n_grid * n_grid, n_feature]
+        theta   = model.theta.data.unsqueeze(0)           # [1, n_class]
+        p_hat   = rclayer(H_train.unsqueeze(0), Q, theta).data.squeeze(0) # [n_class, n_train_sample]
+    # - perform classification for the space
+    p_hat_knn = rc.knn_regressor(H, H_train, p_hat, K=5) # [n_class, n_grid * n_grid]
+    # - visualization
+    plots.visualize_2Dspace_2class(
+        n_grid, max_X, min_X, p_hat_knn,
+        X_train, Y_train, X_test, Y_test, prefix="drknn")
+
+    # Naive k-NN results
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.metrics import accuracy_score
+    # - define raw kNN model
+    knn = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
+    knn.fit(X_train, Y_train)
+    predictions = knn.predict(X_test)
+    print("knn", accuracy_score(predictions, Y_test))
+    # - perform classification for the space
+    pred       = knn.predict(X)
+    space_pred = np.zeros((n_class, X.shape[0]))
+    # - make pred as one-hot vector
+    for i in range(X.shape[0]):
+        space_pred[int(pred[i]), i] = 1
+    space_pred = torch.Tensor(space_pred)
+    # - visualization
+    plots.visualize_2Dspace_2class(
+        n_grid, max_X, min_X, space_pred, 
+        X_train, Y_train, X_test, Y_test, prefix="naive-knn")
+
+
+
+
+if __name__ == "__main__":
+    synthetic_main()
+
     # test
     # Ks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     # hs = [1e+5, 1e+4, 1e+3, 1e+2, 1e+1, 1e+0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
@@ -58,6 +130,3 @@ def main():
     # for name, param in model.named_parameters():
     #     if param.requires_grad:
     #         print(name, param.data)
-
-if __name__ == "__main__":
-    main()

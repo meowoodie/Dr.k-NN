@@ -120,9 +120,9 @@ def test(model, trainloader, testloader, K=5, h=1e-1):
         return rbstclf(H, Q, theta).data
 
     # fetch data from trainset and testset
-    X_train = trainloader.X.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
+    X_train = trainloader.X#.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
     Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
-    X_test  = testloader.X.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
+    X_test  = testloader.X#.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
     Y_test  = testloader.Y                                # [n_test_sample]
     # get H (embeddings) and p_hat for trainset and testset
     model.eval()
@@ -181,8 +181,9 @@ class RobustImageClassifier(torch.nn.Module):
         self.max_theta = max_theta
         self.n_feature = n_feature
         # Image to Vec layer
-        self.data2vec  = nn.SimpleImage2Vec(n_feature, 
-            in_channel, out_channel, n_pixel, kernel_size, stride, keepprob)
+        # self.data2vec  = nn.SimpleImage2Vec(n_feature, 
+        #     in_channel, out_channel, n_pixel, kernel_size, stride, keepprob)
+        self.data2vec  = nn.Vec2Vec(2, n_feature)
         # robust classifier layer
         # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
         #       since it is one of the attributes defined in the model.
@@ -207,8 +208,9 @@ class RobustImageClassifier(torch.nn.Module):
 
         # CNN layer
         # NOTE: merge the batch_size dimension and n_sample dimension
-        X = X.view(batch_size*n_sample, 
-            X.shape[2], X.shape[3], X.shape[4])       # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
+        # X = X.view(batch_size*n_sample, 
+        #     X.shape[2], X.shape[3], X.shape[4])       # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
+        X = X.view(batch_size*n_sample, -1)           # [batch_size*n_sample, n_data]
         Z = self.data2vec(X)                          # [batch_size*n_sample, n_feature]
                                                       # NOTE: reshape back to batch_size and n_sample
         Z = Z.view(batch_size, n_sample, Z.shape[-1]) # [batch_size, n_sample, n_feature]
@@ -319,11 +321,11 @@ class RobustClassifierLayer(torch.nn.Module):
                 cons += [cp.sum(gamma[k], axis=1)[l] == Q[k, l]]
 
         # Problem setup
-        # tv loss
+        # total variation loss
         obj   = cp.Maximize(cp.sum(cp.min(p, axis=0)))
         # cross entropy loss
-        # obj   = cp.Minimize(cp.sum(- cp.sum(p * cp.log(p), axis=0)))
-        prob  = cp.Problem(obj, cons)
+        # obj  = cp.Minimize(cp.sum(- cp.sum(p * cp.log(p), axis=0)))
+        prob = cp.Problem(obj, cons)
         assert prob.is_dpp()
 
         # return cvxpylayer with shape (n_class [batch_size, n_sample, n_sample])

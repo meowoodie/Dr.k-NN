@@ -93,7 +93,7 @@ def visualize_2Dspace_2class(
     H_test = np.nan_to_num(H_test) * n_grid
     # prepare label set
     color_set = ["b", "r"]
-    Y_train   = Y_train.numpy()[0]
+    Y_train   = Y_train.numpy().flatten()
     Y_set     = list(set(Y_train))
     Y_set.sort()
     # plot the region

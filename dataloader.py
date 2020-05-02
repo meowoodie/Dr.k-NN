@@ -12,8 +12,9 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from itertools import combinations 
+from sklearn.datasets import make_swiss_roll
 
-np.random.seed(1)
+np.random.seed(3)
 
 class MiniSetLoader(torch.utils.data.Dataset):
     """
@@ -136,6 +137,7 @@ class MiniSetLoader(torch.utils.data.Dataset):
 
 class SyntheticGaussianDataset(object):
     """
+    Generate synthetic data from multiple Gaussian distributions.
     """
 
     def __init__(self, n_class, means, covs, N):
@@ -147,8 +149,27 @@ class SyntheticGaussianDataset(object):
         self.targets = []
         for y, (mean, cov) in enumerate(zip(means, covs)):
             X = np.random.multivariate_normal(mean, cov, N)
-            Y = y * np.ones(N)
+            Y = (y + 1) * np.ones(N)
             self.data.append(X)
             self.targets.append(Y)
-        self.data    = np.concatenate(self.data)
-        self.targets = np.concatenate(self.targets)
+        self.data    = torch.Tensor(np.concatenate(self.data))
+        self.targets = torch.Tensor(np.concatenate(self.targets))
+    
+class SyntheticSwissrollDataset(object):
+    """
+    Generate synthetic data from multiple swiss rolls.
+    """
+
+    def __init__(self, N):
+        # class 1
+        X1, _ = make_swiss_roll(n_samples=N, noise=0.6, random_state=None)
+        X1    = X1[:, [0, 2]]
+        Y1    = 0 * np.ones(N)
+        # class 2
+        X2, _ = make_swiss_roll(n_samples=N, noise=0.6, random_state=None)
+        dX2   = X2[:, [0, 2]] - np.array([0., 0.])
+        X2    = np.array([0., 0.]) - dX2
+        Y2    = 1 * np.ones(N)
+        # merge
+        self.data    = torch.Tensor(np.concatenate([X1, X2]))
+        self.targets = torch.Tensor(np.concatenate([Y1, Y2]))
