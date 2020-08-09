@@ -3,12 +3,10 @@
 
 """
 Robust Classifier
-
 NOTE:
 in my conda environment, cvxpy can only be installed via pip. 
 if you need install cvxpy in conda, please ref to the reference below:
 https://stackoverflow.com/questions/41060382/using-pip-to-install-packages-to-anaconda-environment
-
 Dependencies:
 - Python      3.7.6
 - NumPy       1.18.1
@@ -33,11 +31,9 @@ from cvxpylayers.torch import CvxpyLayer
 def knn_regressor(H_test, H_train, p_hat_train, K=5):
     """
     k-Nearest Neighbor Regressor
-
     Given the train embedding and its corresponding optimal marginal distribution for each class,
     the function produce the prediction of p_hat for testing dataset given the test embedding based
     on the k-Nearest Neighbor rule.
-
     input
     - H_test:      [n_test_sample, n_feature]
     - H_train:     [n_train_sample, n_feature]
@@ -58,11 +54,9 @@ def knn_regressor(H_test, H_train, p_hat_train, K=5):
 def kernel_smoother(H_test, H_train, p_hat_train, h=1e-1):
     """
     kernel smoothing test
-
     Given the train embedding and its corresponding optimal marginal distribution for each class,
     the function produce the prediction of p_hat for testing dataset given the test embedding based
     on the kernel smoothing rule with the bandwidth h.
-
     input
     - H_test:      [n_test_sample, n_feature]
     - H_train:     [n_train_sample, n_feature]
@@ -91,6 +85,7 @@ def train(model, trainloader, testloader=None, n_iter=100, log_interval=10, lr=1
     #       since it is not leaf node. (it's root node)
     optimizer = optim.Adadelta(model.parameters(), lr=lr)
     for batch_idx, (X, Y) in enumerate(trainloader):
+        X, Y = X.float(), Y.float()
         model.train()
         Q = utils.sortedY2Q(Y)      # calculate empirical distribution based on labels
         optimizer.zero_grad()       # init optimizer (set gradient to be zero)
@@ -103,7 +98,7 @@ def train(model, trainloader, testloader=None, n_iter=100, log_interval=10, lr=1
             print("[%s] Train batch: %d\tLoss: %.3f" % (arrow.now(), batch_idx, loss.item()))
             # TODO: temporarily place test right here, will remove it in the end.
             if testloader is not None:
-                test(model, trainloader, testloader, K=5, h=1e-3)
+                test(model, trainloader, testloader, K=5, h=1e-1)
         if batch_idx > n_iter:
             break
         
@@ -120,10 +115,10 @@ def test(model, trainloader, testloader, K=5, h=1e-1):
         return rbstclf(H, Q, theta).data
 
     # fetch data from trainset and testset
-    X_train = trainloader.X#.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
-    Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
-    X_test  = testloader.X#.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
-    Y_test  = testloader.Y                                # [n_test_sample]
+    X_train = trainloader.X.float().unsqueeze(1)          # [n_train_sample, 1, n_pixel, n_pixel] 
+    Y_train = trainloader.Y.float().unsqueeze(0)          # [1, n_train_sample]
+    X_test  = testloader.X.float().unsqueeze(1)           # [n_test_sample, 1, n_pixel, n_pixel] 
+    Y_test  = testloader.Y.float()                        # [n_test_sample]
     # get H (embeddings) and p_hat for trainset and testset
     model.eval()
     with torch.no_grad():
@@ -181,9 +176,8 @@ class RobustImageClassifier(torch.nn.Module):
         self.max_theta = max_theta
         self.n_feature = n_feature
         # Image to Vec layer
-        # self.data2vec  = nn.SimpleImage2Vec(n_feature, 
-        #     in_channel, out_channel, n_pixel, kernel_size, stride, keepprob)
-        self.data2vec  = nn.Vec2Vec(2, n_feature)
+        self.data2vec  = nn.SimpleImage2Vec(n_feature, 
+            in_channel, out_channel, n_pixel, kernel_size, stride, keepprob)
         # robust classifier layer
         # NOTE: if self.theta is a parameter, then it cannot be reassign with other values, 
         #       since it is one of the attributes defined in the model.
@@ -195,7 +189,6 @@ class RobustImageClassifier(torch.nn.Module):
     def forward(self, X, Q):
         """
         customized forward function.
-
         input
         - X:     [batch_size, n_sample, in_channel, n_pixel, n_pixel]
         - Q:     [batch_size, n_class, n_sample]
@@ -208,9 +201,8 @@ class RobustImageClassifier(torch.nn.Module):
 
         # CNN layer
         # NOTE: merge the batch_size dimension and n_sample dimension
-        # X = X.view(batch_size*n_sample, 
-        #     X.shape[2], X.shape[3], X.shape[4])       # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
-        X = X.view(batch_size*n_sample, -1)           # [batch_size*n_sample, n_data]
+        X = X.view(batch_size*n_sample, 
+            X.shape[2], X.shape[3], X.shape[4])       # [batch_size*n_sample, in_channel, n_pixel, n_pixel]
         Z = self.data2vec(X)                          # [batch_size*n_sample, n_feature]
                                                       # NOTE: reshape back to batch_size and n_sample
         Z = Z.view(batch_size, n_sample, Z.shape[-1]) # [batch_size, n_sample, n_feature]
@@ -243,7 +235,6 @@ class RobustClassifierLayer(torch.nn.Module):
         customized forward function. 
         X_tch is a single batch of the input data and Q_tch is the empirical distribution obtained from  
         the labels of this batch.
-
         input:
         - X_tch: [batch_size, n_sample, n_feature]
         - Q_tch: [batch_size, n_class, n_sample]
@@ -321,11 +312,11 @@ class RobustClassifierLayer(torch.nn.Module):
                 cons += [cp.sum(gamma[k], axis=1)[l] == Q[k, l]]
 
         # Problem setup
-        # total variation loss
+        # tv loss
         obj   = cp.Maximize(cp.sum(cp.min(p, axis=0)))
         # cross entropy loss
-        # obj  = cp.Minimize(cp.sum(- cp.sum(p * cp.log(p), axis=0)))
-        prob = cp.Problem(obj, cons)
+        # obj   = cp.Minimize(cp.sum(- cp.sum(p * cp.log(p), axis=0)))
+        prob  = cp.Problem(obj, cons)
         assert prob.is_dpp()
 
         # return cvxpylayer with shape (n_class [batch_size, n_sample, n_sample])
@@ -339,7 +330,6 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     """
     search through the embedding space, return the corresponding p_hat of a set of uniformly 
     sampled points in the space.
-
     NOTE: now it only supports 2D embedding space
     """
     # given hidden embedding, evaluate corresponding p_hat 
@@ -351,10 +341,10 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
 
     assert model.n_feature == 2
     # fetch data from trainset and testset
-    X_train = trainloader.X.unsqueeze(1)                  # [n_train_sample, 1, n_pixel, n_pixel] 
-    Y_train = trainloader.Y.unsqueeze(0)                  # [1, n_train_sample]
-    X_test  = testloader.X.unsqueeze(1)                   # [n_test_sample, 1, n_pixel, n_pixel] 
-    Y_test  = testloader.Y                                # [n_test_sample]
+    X_train = trainloader.X.float().unsqueeze(1)          # [n_train_sample, 1, n_pixel, n_pixel] 
+    Y_train = trainloader.Y.float().unsqueeze(0)          # [1, n_train_sample]
+    X_test  = testloader.X.float().unsqueeze(1)           # [n_test_sample, 1, n_pixel, n_pixel] 
+    Y_test  = testloader.Y.float()                        # [n_test_sample]
     # get H (embeddings) and p_hat for trainset and testset
     model.eval()
     with torch.no_grad():
@@ -380,41 +370,3 @@ def search_through(model, trainloader, testloader, n_grid=50, K=8, h=1e-1):
     plots.visualize_2Dspace_2class(
         n_grid, max_H, min_H, p_hat_knn,
         H_train, Y_train, H_test, Y_test, prefix="test")
-
-    # # perform boundary knn test
-    # _p_hat         = p_hat[0] / (p_hat[0] + p_hat[1])
-    # print(_p_hat)
-    # _indices       = ((_p_hat > 0.05) * (_p_hat < 0.95)).nonzero().flatten()
-    # print(_indices)
-    # bdry_p_hat     = p_hat[:, _indices]
-    # bdry_H_train   = H_train[_indices]
-    # bdry_Y_train   = Y_train[:, _indices]
-    # print(bdry_p_hat.shape, bdry_H_train.shape)
-    # bdry_p_hat_knn = knn_regressor(H, bdry_H_train, bdry_p_hat, 2)  # [n_class, n_grid * n_grid]
-
-    # # plot the space and the training point
-    # plots.visualize_2Dspace_LFD(
-    #     n_grid, max_H, min_H, p_hat_kernel, 0,
-    #     H_train, Y_train, H_test, Y_test, prefix="class0")
-    # plots.visualize_2Dspace_LFD(
-    #     n_grid, max_H, min_H, p_hat_kernel, 1,
-    #     H_train, Y_train, H_test, Y_test, prefix="class1")
-    # plots.visualize_2Dspace_LFD(
-    #     n_grid, max_H, min_H, p_hat_kernel, 2,
-    #     H_train, Y_train, H_test, Y_test, prefix="class2")
-    # plots.visualize_2Dspace_Nclass(
-    #     n_grid, max_H, min_H, p_hat_knn,
-    #     H_train, Y_train, H_test, Y_test, prefix="knn")
-
-    # plots.visualize_2Dspace_2class_boundary(
-    #     n_grid, max_H, min_H, p_hat_knn,
-    #     H_train, Y_train, H_test, Y_test, prefix="kernel_boundary")
-    # plots.visualize_2Dspace_2class_boundary(
-    #     n_grid, max_H, min_H, p_hat_kernel,
-    #     H_train, Y_train, H_test, Y_test, prefix="knn_boundary")
-    # plots.visualize_2Dspace_Nclass(
-    #     n_grid, max_H, min_H, p_hat_knn,
-    #     H_train, Y_train, H_test, Y_test, prefix="knn")
-    # plots.visualize_2Dspace_Nclass(
-    #     n_grid, max_H, min_H, bdry_p_hat_knn,
-    #     bdry_H_train, bdry_Y_train, H_test, Y_test, prefix="knn_boundary_select")
